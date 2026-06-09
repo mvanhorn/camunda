@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.camunda.db.rdbms.RdbmsSchemaManagerRegistry;
 import io.camunda.db.rdbms.RdbmsService;
 import io.camunda.db.rdbms.RdbmsServiceFactory;
+import io.camunda.db.rdbms.exception.ExporterPositionMismatchException;
 import io.camunda.db.rdbms.sql.ExporterPositionMapper;
 import io.camunda.db.rdbms.write.RdbmsMapperBundle;
 import io.camunda.db.rdbms.write.domain.ExporterPositionModel;
@@ -55,6 +56,7 @@ import io.camunda.security.core.authz.TenantCheck;
 import io.camunda.zeebe.auth.Authorization;
 import io.camunda.zeebe.broker.exporter.context.ExporterConfiguration;
 import io.camunda.zeebe.broker.exporter.context.ExporterContext;
+import io.camunda.zeebe.exporter.api.ExporterException;
 import io.camunda.zeebe.exporter.test.ExporterTestController;
 import io.camunda.zeebe.protocol.record.ImmutableRecord;
 import io.camunda.zeebe.protocol.record.Record;
@@ -1527,10 +1529,16 @@ class RdbmsExporterIT {
     tamperExporterPosition(tamperedPosition);
     final var processInstanceRecord = FIXTURES.getProcessInstanceStartedRecord();
     assertThatThrownBy(() -> exporter.export(processInstanceRecord))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("Exporter position mismatch for partition 1")
+        .isInstanceOf(ExporterException.class)
+        .satisfies(
+            ex ->
+                assertThat(((ExporterException) ex).getCompensation())
+                    .isEqualTo(ExporterException.Compensation.REOPEN))
+        .hasCauseInstanceOf(ExporterPositionMismatchException.class)
+        .rootCause()
+        .hasMessageContaining("partition 1")
         .hasMessageContaining("expected " + currentPosition)
-        .hasMessageContaining("but found " + tamperedPosition);
+        .hasMessageContaining(String.valueOf(tamperedPosition));
 
     // cleanup because the H2 is shared
     FIXTURES.resetPosition(currentPosition);
