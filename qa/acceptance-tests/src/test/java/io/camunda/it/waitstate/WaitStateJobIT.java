@@ -511,6 +511,7 @@ public class WaitStateJobIT {
                       .join()
                       .items();
               assertThat(items).hasSize(1);
+              assertThat(items.getFirst().getDetails()).isInstanceOf(JobWaitStateDetails.class);
               assertThat(((JobWaitStateDetails) items.getFirst().getDetails()).getRetries())
                   .isEqualTo(3);
             });
@@ -540,6 +541,7 @@ public class WaitStateJobIT {
                       .join()
                       .items();
               assertThat(items).hasSize(1);
+              assertThat(items.getFirst().getDetails()).isInstanceOf(JobWaitStateDetails.class);
               assertThat(((JobWaitStateDetails) items.getFirst().getDetails()).getRetries())
                   .isEqualTo(2);
             });
@@ -575,6 +577,7 @@ public class WaitStateJobIT {
                       .join()
                       .items();
               assertThat(items).hasSize(1);
+              assertThat(items.getFirst().getDetails()).isInstanceOf(JobWaitStateDetails.class);
               assertThat(((JobWaitStateDetails) items.getFirst().getDetails()).getRetries())
                   .isEqualTo(0);
             });
@@ -582,6 +585,18 @@ public class WaitStateJobIT {
     // cleanup — cancel instance to remove the wait state
     camundaClient.newCancelInstanceCommand(pik).execute();
     waitForProcessInstanceToBeTerminated(camundaClient, pik);
+    Awaitility.await("wait state should be removed after cleanup")
+        .atMost(TIMEOUT_DATA_AVAILABILITY)
+        .untilAsserted(
+            () ->
+                assertThat(
+                        camundaClient
+                            .newElementInstanceWaitStateSearchRequest()
+                            .filter(f -> f.processInstanceKey(pik))
+                            .send()
+                            .join()
+                            .items())
+                    .isEmpty());
   }
 
   /**
