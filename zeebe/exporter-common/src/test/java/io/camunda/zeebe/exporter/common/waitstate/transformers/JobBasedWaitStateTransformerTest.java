@@ -250,6 +250,8 @@ class JobBasedWaitStateTransformerTest {
     assertThat(transformer.triggersUpdate(retriesUpdated)).isTrue();
     assertThat(transformer.triggersAdd(failed)).isFalse();
     assertThat(transformer.triggersRemoval(failed)).isFalse();
+    assertThat(transformer.triggersAdd(retriesUpdated)).isFalse();
+    assertThat(transformer.triggersRemoval(retriesUpdated)).isFalse();
   }
 
   @Test
