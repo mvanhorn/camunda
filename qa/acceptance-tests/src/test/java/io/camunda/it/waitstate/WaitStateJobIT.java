@@ -483,6 +483,107 @@ public class WaitStateJobIT {
                     .isEmpty());
   }
 
+  @Test
+  void shouldReflectCurrentRetriesAfterJobFailure() {
+    // given — isolated single-task process, configured retries = 3
+    final BpmnModelInstance process =
+        Bpmn.createExecutableProcess("waitStateRetriesProcess")
+            .startEvent()
+            .serviceTask("retries-task")
+            .zeebeJobType("retries-svc")
+            .zeebeJobRetries("3")
+            .endEvent()
+            .done();
+    deployProcessAndWaitForIt(camundaClient, process, "waitStateRetriesProcess.bpmn");
+
+    final long pik =
+        startProcessInstance(camundaClient, "waitStateRetriesProcess").getProcessInstanceKey();
+
+    Awaitility.await("wait state should appear with retries=3")
+        .atMost(TIMEOUT_DATA_AVAILABILITY)
+        .untilAsserted(
+            () -> {
+              final var items =
+                  camundaClient
+                      .newElementInstanceWaitStateSearchRequest()
+                      .filter(f -> f.processInstanceKey(pik))
+                      .send()
+                      .join()
+                      .items();
+              assertThat(items).hasSize(1);
+              assertThat(((JobWaitStateDetails) items.getFirst().getDetails()).getRetries())
+                  .isEqualTo(3);
+            });
+
+    // when — fail the job once, leaving 2 retries
+    final long jobKey1 =
+        camundaClient
+            .newActivateJobsCommand()
+            .jobType("retries-svc")
+            .maxJobsToActivate(1)
+            .send()
+            .join()
+            .getJobs()
+            .getFirst()
+            .getKey();
+    camundaClient.newFailCommand(jobKey1).retries(2).errorMessage("fail 1").send().join();
+
+    Awaitility.await("wait state should reflect retries=2 after first failure")
+        .atMost(TIMEOUT_DATA_AVAILABILITY)
+        .untilAsserted(
+            () -> {
+              final var items =
+                  camundaClient
+                      .newElementInstanceWaitStateSearchRequest()
+                      .filter(f -> f.processInstanceKey(pik))
+                      .send()
+                      .join()
+                      .items();
+              assertThat(items).hasSize(1);
+              assertThat(((JobWaitStateDetails) items.getFirst().getDetails()).getRetries())
+                  .isEqualTo(2);
+            });
+
+    // when — fail the job again with retries=0, triggering an incident
+    final long jobKey2 =
+        camundaClient
+            .newActivateJobsCommand()
+            .jobType("retries-svc")
+            .maxJobsToActivate(1)
+            .send()
+            .join()
+            .getJobs()
+            .getFirst()
+            .getKey();
+    camundaClient
+        .newFailCommand(jobKey2)
+        .retries(0)
+        .errorMessage("fail 2 - exhausted")
+        .send()
+        .join();
+
+    // then — retries=0 even though an incident is raised
+    Awaitility.await("wait state should reflect retries=0 after exhaustion")
+        .atMost(TIMEOUT_DATA_AVAILABILITY)
+        .untilAsserted(
+            () -> {
+              final var items =
+                  camundaClient
+                      .newElementInstanceWaitStateSearchRequest()
+                      .filter(f -> f.processInstanceKey(pik))
+                      .send()
+                      .join()
+                      .items();
+              assertThat(items).hasSize(1);
+              assertThat(((JobWaitStateDetails) items.getFirst().getDetails()).getRetries())
+                  .isEqualTo(0);
+            });
+
+    // cleanup — cancel instance to remove the wait state
+    camundaClient.newCancelInstanceCommand(pik).execute();
+    waitForProcessInstanceToBeTerminated(camundaClient, pik);
+  }
+
   /**
    * Filters by both element type and element id, then asserts the wait state type, element type,
    * element id, and all fields of the typed {@link JobWaitStateDetails}.
