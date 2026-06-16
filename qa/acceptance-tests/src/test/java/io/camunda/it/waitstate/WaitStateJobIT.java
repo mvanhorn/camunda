@@ -416,9 +416,7 @@ public class WaitStateJobIT {
             .endEvent()
             .done();
 
-    final long v1Key =
-        deployProcessAndWaitForIt(camundaClient, v1, "waitStateMigrationProcessV1.bpmn")
-            .getProcessDefinitionKey();
+    deployProcessAndWaitForIt(camundaClient, v1, "waitStateMigrationProcessV1.bpmn");
     final long v2Key =
         deployProcessAndWaitForIt(camundaClient, v2, "waitStateMigrationProcessV2.bpmn")
             .getProcessDefinitionKey();
