@@ -13,6 +13,7 @@ import io.camunda.zeebe.exporter.common.waitstate.WaitStateEntry;
 import io.camunda.zeebe.exporter.common.waitstate.WaitStateTransformer;
 import io.camunda.zeebe.exporter.common.waitstate.WaitStateTransformerConfig;
 import io.camunda.zeebe.protocol.record.Record;
+import io.camunda.zeebe.protocol.record.intent.JobIntent;
 import io.camunda.zeebe.protocol.record.value.JobKind;
 import io.camunda.zeebe.protocol.record.value.JobListenerEventType;
 import io.camunda.zeebe.protocol.record.value.JobRecordValue;
@@ -28,6 +29,11 @@ public class JobBasedWaitStateTransformer implements WaitStateTransformer<JobRec
   @Override
   public void extract(final Record<JobRecordValue> record, final WaitStateEntry entry) {
     final JobRecordValue value = record.getValue();
+    // FAILED and RETRIES_UPDATED may carry "NO_CATCH_EVENT_FOUND" as elementId when a BPMN error
+    // has no catch event. Null it out so update handlers preserve the stored elementId instead.
+    if (record.getIntent() == JobIntent.FAILED || record.getIntent() == JobIntent.RETRIES_UPDATED) {
+      entry.setElementId(null);
+    }
     entry
         .setElementType(value.getElementType())
         .setDetails(

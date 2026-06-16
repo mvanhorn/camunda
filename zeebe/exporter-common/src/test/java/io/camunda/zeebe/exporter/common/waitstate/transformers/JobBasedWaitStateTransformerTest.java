@@ -255,6 +255,33 @@ class JobBasedWaitStateTransformerTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  void shouldNullOutElementIdForFailedAndRetriesUpdatedToAvoidSentinelCorruption() {
+    // given — FAILED and RETRIES_UPDATED may carry "NO_CATCH_EVENT_FOUND" as elementId;
+    // the transformer must null it out so update handlers preserve the stored value.
+    final Record<JobRecordValue> failed =
+        (Record<JobRecordValue>)
+            (Record<?>)
+                factory.generateRecord(
+                    ValueType.JOB,
+                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.FAILED));
+    final Record<JobRecordValue> retriesUpdated =
+        (Record<JobRecordValue>)
+            (Record<?>)
+                factory.generateRecord(
+                    ValueType.JOB,
+                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.RETRIES_UPDATED));
+
+    // when
+    final var failedEntry = transformer.transform(failed);
+    final var retriesUpdatedEntry = transformer.transform(retriesUpdated);
+
+    // then
+    assertThat(failedEntry.getElementId()).isNull();
+    assertThat(retriesUpdatedEntry.getElementId()).isNull();
+  }
+
+  @Test
   void shouldExtractRemainingRetriesFromJobFailedRecord() {
     // given
     final JobRecordValue value =

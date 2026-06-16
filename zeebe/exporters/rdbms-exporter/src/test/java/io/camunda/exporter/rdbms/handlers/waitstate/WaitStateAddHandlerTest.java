@@ -176,6 +176,43 @@ class WaitStateAddHandlerTest {
   }
 
   @Test
+  void shouldPreserveElementIdOnJobFailedExport() {
+    // given — FAILED records may carry NO_CATCH_EVENT_FOUND as elementId; the model
+    // must have null elementId so the SQL conditional skips overwriting ELEMENT_ID.
+    final JobRecordValue value =
+        ImmutableJobRecordValue.builder()
+            .from(factory.generateObject(JobRecordValue.class))
+            .withType("payment-service")
+            .withJobKind(JobKind.BPMN_ELEMENT)
+            .withJobListenerEventType(JobListenerEventType.UNSPECIFIED)
+            .withRetries(0)
+            .withElementType(BpmnElementType.SERVICE_TASK)
+            .withElementId("NO_CATCH_EVENT_FOUND")
+            .withElementInstanceKey(300L)
+            .withProcessInstanceKey(200L)
+            .withRootProcessInstanceKey(100L)
+            .withTenantId(TenantOwned.DEFAULT_TENANT_IDENTIFIER)
+            .build();
+    final Record<JobRecordValue> record =
+        factory.generateRecord(
+            ValueType.JOB,
+            r ->
+                r.withKey(999L)
+                    .withRecordType(RecordType.EVENT)
+                    .withIntent(JobIntent.FAILED)
+                    .withValue(value));
+
+    // when
+    handler.export(record);
+
+    // then — update is called, and elementId is null so SQL preserves the stored value
+    verify(waitStateWriter).update(modelCaptor.capture());
+    final WaitStateDbModel model = modelCaptor.getValue();
+    assertThat(model.elementId()).isNull();
+    assertThat(model.details()).contains("\"retries\":0");
+  }
+
+  @Test
   void shouldInsertWaitStateRowOnUserTaskCreated() {
     // given
     final WaitStateAddHandler<UserTaskRecordValue> userTaskHandler =

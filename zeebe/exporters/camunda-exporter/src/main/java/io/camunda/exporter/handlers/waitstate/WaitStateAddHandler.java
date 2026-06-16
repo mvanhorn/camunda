@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.exporter.exceptions.PersistenceException;
 import io.camunda.exporter.handlers.ExportHandler;
 import io.camunda.exporter.store.BatchRequest;
+import io.camunda.webapps.schema.descriptors.template.WaitStateTemplate;
 import io.camunda.webapps.schema.entities.waitstate.WaitStateEntity;
 import io.camunda.zeebe.exporter.common.waitstate.WaitStateDetails;
 import io.camunda.zeebe.exporter.common.waitstate.WaitStateTransformer;
@@ -20,7 +21,9 @@ import io.camunda.zeebe.protocol.record.RecordValue;
 import io.camunda.zeebe.protocol.record.ValueType;
 import io.camunda.zeebe.protocol.record.value.WaitStateRelated;
 import io.camunda.zeebe.util.VisibleForTesting;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,7 +97,21 @@ public class WaitStateAddHandler<R extends RecordValue & WaitStateRelated>
   @Override
   public void flush(final WaitStateEntity entity, final BatchRequest batchRequest)
       throws PersistenceException {
-    batchRequest.add(indexName, entity);
+    final Map<String, Object> updateFields = new HashMap<>();
+    updateFields.put(
+        WaitStateTemplate.ROOT_PROCESS_INSTANCE_KEY, entity.getRootProcessInstanceKey());
+    updateFields.put(WaitStateTemplate.PROCESS_INSTANCE_KEY, entity.getProcessInstanceKey());
+    updateFields.put(WaitStateTemplate.ELEMENT_INSTANCE_KEY, entity.getElementInstanceKey());
+    if (entity.getElementId() != null) {
+      updateFields.put(WaitStateTemplate.ELEMENT_ID, entity.getElementId());
+    }
+    updateFields.put(WaitStateTemplate.ELEMENT_TYPE, entity.getElementType());
+    updateFields.put(WaitStateTemplate.WAIT_STATE_TYPE, entity.getWaitStateType());
+    updateFields.put(WaitStateTemplate.BPMN_PROCESS_ID, entity.getBpmnProcessId());
+    updateFields.put(WaitStateTemplate.DETAILS, entity.getDetails());
+    updateFields.put(WaitStateTemplate.TENANT_ID, entity.getTenantId());
+    updateFields.put(WaitStateTemplate.PARTITION_ID, entity.getPartitionId());
+    batchRequest.upsert(indexName, entity.getId(), entity, updateFields);
   }
 
   @Override
