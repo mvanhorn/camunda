@@ -227,4 +227,62 @@ class JobBasedWaitStateTransformerTest {
     assertThat(transformer.triggersAdd(completed)).isFalse();
     assertThat(transformer.triggersAdd(canceled)).isFalse();
   }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void shouldTriggerUpdateOnJobFailedAndRetriesUpdated() {
+    // given
+    final Record<JobRecordValue> failed =
+        (Record<JobRecordValue>)
+            (Record<?>)
+                factory.generateRecord(
+                    ValueType.JOB,
+                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.FAILED));
+    final Record<JobRecordValue> retriesUpdated =
+        (Record<JobRecordValue>)
+            (Record<?>)
+                factory.generateRecord(
+                    ValueType.JOB,
+                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.RETRIES_UPDATED));
+
+    // when / then
+    assertThat(transformer.config().updateIntents()).contains(JobIntent.FAILED);
+    assertThat(transformer.config().updateIntents()).contains(JobIntent.RETRIES_UPDATED);
+  }
+
+  @Test
+  void shouldExtractRemainingRetriesFromJobFailedRecord() {
+    // given
+    final JobRecordValue value =
+        ImmutableJobRecordValue.builder()
+            .from(factory.generateObject(JobRecordValue.class))
+            .withType("retry-service")
+            .withJobKind(JobKind.BPMN_ELEMENT)
+            .withJobListenerEventType(JobListenerEventType.UNSPECIFIED)
+            .withRetries(1)
+            .withElementType(BpmnElementType.SERVICE_TASK)
+            .withElementId("retry-task")
+            .withElementInstanceKey(300L)
+            .withProcessInstanceKey(200L)
+            .withRootProcessInstanceKey(100L)
+            .withTenantId(TenantOwned.DEFAULT_TENANT_IDENTIFIER)
+            .build();
+
+    final Record<JobRecordValue> record =
+        factory.generateRecord(
+            ValueType.JOB,
+            r ->
+                r.withKey(888L)
+                    .withRecordType(RecordType.EVENT)
+                    .withIntent(JobIntent.FAILED)
+                    .withValue(value));
+
+    // when
+    final var entry = transformer.transform(record);
+
+    // then
+    assertThat(entry.getDetails()).isInstanceOf(JobWaitStateDetails.class);
+    final var details = (JobWaitStateDetails) entry.getDetails();
+    assertThat(details.retries()).isEqualTo(1);
+  }
 }
