@@ -246,8 +246,10 @@ class JobBasedWaitStateTransformerTest {
                     r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.RETRIES_UPDATED));
 
     // when / then
-    assertThat(transformer.config().updateIntents()).contains(JobIntent.FAILED);
-    assertThat(transformer.config().updateIntents()).contains(JobIntent.RETRIES_UPDATED);
+    assertThat(transformer.triggersUpdate(failed)).isTrue();
+    assertThat(transformer.triggersUpdate(retriesUpdated)).isTrue();
+    assertThat(transformer.triggersAdd(failed)).isFalse();
+    assertThat(transformer.triggersRemoval(failed)).isFalse();
   }
 
   @Test
