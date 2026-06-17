@@ -56,12 +56,21 @@ public class Archiver {
             partitionIds.size());
       }
 
+      final boolean archiveById = operateProperties.getArchiver().isArchiveByIdEnabled();
+      if (archiveById) {
+        LOGGER.info("Archive-by-ID mode enabled (opt-in).");
+      }
+
       for (int i = 0; i < threadsCount; i++) {
         final List<Integer> partitionIdsSubset =
             CollectionUtil.splitAndGetSublist(partitionIds, threadsCount, i);
         if (!partitionIdsSubset.isEmpty()) {
-          final var processInstancesArchiverJob =
-              beanFactory.getBean(ProcessInstancesArchiverJob.class, this, partitionIdsSubset);
+          final AbstractArchiverJob processInstancesArchiverJob =
+              archiveById
+                  ? beanFactory.getBean(
+                      ProcessInstancesByIdArchiverJob.class, this, partitionIdsSubset)
+                  : beanFactory.getBean(
+                      ProcessInstancesArchiverJob.class, this, partitionIdsSubset);
           archiverExecutor.execute(processInstancesArchiverJob);
 
           final var standaloneDecisionArchiverJob =
