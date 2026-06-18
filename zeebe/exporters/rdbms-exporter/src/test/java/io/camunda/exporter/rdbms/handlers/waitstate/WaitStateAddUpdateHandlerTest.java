@@ -39,7 +39,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class WaitStateAddHandlerTest {
+class WaitStateAddUpdateHandlerTest {
 
   private final ProtocolFactory factory = new ProtocolFactory();
   private final ObjectMapper objectMapper = new ObjectMapper();
@@ -47,12 +47,12 @@ class WaitStateAddHandlerTest {
   @Mock private WaitStateWriter waitStateWriter;
   @Captor private ArgumentCaptor<WaitStateDbModel> modelCaptor;
 
-  private WaitStateAddHandler<JobRecordValue> handler;
+  private WaitStateAddUpdateHandler<JobRecordValue> handler;
 
   @BeforeEach
   void setUp() {
     handler =
-        new WaitStateAddHandler<>(
+        new WaitStateAddUpdateHandler<>(
             waitStateWriter, new JobBasedWaitStateTransformer(), objectMapper);
   }
 
@@ -215,8 +215,8 @@ class WaitStateAddHandlerTest {
   @Test
   void shouldInsertWaitStateRowOnUserTaskCreated() {
     // given
-    final WaitStateAddHandler<UserTaskRecordValue> userTaskHandler =
-        new WaitStateAddHandler<>(
+    final WaitStateAddUpdateHandler<UserTaskRecordValue> userTaskHandler =
+        new WaitStateAddUpdateHandler<>(
             waitStateWriter, new UserTaskBasedWaitStateTransformer(), objectMapper);
     final Record<UserTaskRecordValue> record =
         userTaskRecord(UserTaskIntent.CREATED, "approve-task");
@@ -239,8 +239,8 @@ class WaitStateAddHandlerTest {
   @Test
   void shouldUpdateWaitStateRowOnUserTaskUpdated() {
     // given
-    final WaitStateAddHandler<UserTaskRecordValue> userTaskHandler =
-        new WaitStateAddHandler<>(
+    final WaitStateAddUpdateHandler<UserTaskRecordValue> userTaskHandler =
+        new WaitStateAddUpdateHandler<>(
             waitStateWriter, new UserTaskBasedWaitStateTransformer(), objectMapper);
     final Record<UserTaskRecordValue> record =
         userTaskRecord(UserTaskIntent.UPDATED, "approve-task");

@@ -23,21 +23,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Inserts a {@link WaitStateDbModel} when a process element enters a waiting state. The row is
- * keyed by the stable entity key (e.g. jobKey, userTaskKey).
+ * Inserts or updates a {@link WaitStateDbModel} when a process element enters or transitions a
+ * waiting state. The row is keyed by the stable entity key (e.g. jobKey, userTaskKey).
  *
  * @param <R> the record value type handled by the injected transformer
  */
-public class WaitStateAddHandler<R extends RecordValue & WaitStateRelated>
+public class WaitStateAddUpdateHandler<R extends RecordValue & WaitStateRelated>
     implements RdbmsExportHandler<R> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(WaitStateAddHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(WaitStateAddUpdateHandler.class);
 
   private final WaitStateWriter waitStateWriter;
   private final WaitStateTransformer<R> transformer;
   private final ObjectMapper objectMapper;
 
-  public WaitStateAddHandler(
+  public WaitStateAddUpdateHandler(
       final WaitStateWriter waitStateWriter,
       final WaitStateTransformer<R> transformer,
       final ObjectMapper objectMapper) {
