@@ -276,22 +276,50 @@ class JobWaitStateHandlerTest {
   }
 
   @Test
-  void shouldUpdateHandlerFlushWithDetailsOnlyUpsert() throws PersistenceException {
-    // given
+  void shouldUpdateHandlerFlushWithDetailsOnlyWhenElementIdIsNull() throws PersistenceException {
+    // given — FAILED/RETRIES_UPDATED: transformer nulls elementId to avoid overwriting stored value
     final var id = String.valueOf(JOB_KEY);
-    final var entity = new WaitStateEntity().setId(id).setDetails("{\"retries\":2}");
+    final var entity = new WaitStateEntity().setId(id).setDetails("{\"retries\":0}");
     final var batchRequest = mock(BatchRequest.class);
 
     // when
     updateHandler.flush(entity, batchRequest);
 
-    // then — only the DETAILS field is sent in the partial update map
+    // then — only DETAILS in the update map; ELEMENT_ID is skipped
     verify(batchRequest)
         .upsert(
             eq(INDEX_NAME),
             eq(id),
             eq(entity),
             argThat(map -> map.containsKey(WaitStateTemplate.DETAILS) && map.size() == 1));
+  }
+
+  @Test
+  void shouldUpdateHandlerFlushWithElementIdAndDetailsWhenElementIdIsPresent()
+      throws PersistenceException {
+    // given — MIGRATED: elementId is populated with the new element id
+    final var id = String.valueOf(JOB_KEY);
+    final var entity =
+        new WaitStateEntity()
+            .setId(id)
+            .setElementId("task-after-migration")
+            .setDetails("{\"retries\":3}");
+    final var batchRequest = mock(BatchRequest.class);
+
+    // when
+    updateHandler.flush(entity, batchRequest);
+
+    // then — both ELEMENT_ID and DETAILS are sent; elementId gets updated in the index
+    verify(batchRequest)
+        .upsert(
+            eq(INDEX_NAME),
+            eq(id),
+            eq(entity),
+            argThat(
+                map ->
+                    map.containsKey(WaitStateTemplate.ELEMENT_ID)
+                        && map.containsKey(WaitStateTemplate.DETAILS)
+                        && map.size() == 2));
   }
 
   @Test

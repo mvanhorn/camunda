@@ -16,12 +16,13 @@ import io.camunda.zeebe.exporter.common.waitstate.WaitStateTransformer;
 import io.camunda.zeebe.protocol.record.Record;
 import io.camunda.zeebe.protocol.record.RecordValue;
 import io.camunda.zeebe.protocol.record.value.WaitStateRelated;
+import java.util.HashMap;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Updates the {@code details} field of an existing {@link WaitStateEntity} in the wait-state index
- * when a process element's waiting state changes (e.g. job retries updated). Uses upsert so the
+ * Updates mutable fields of an existing {@link WaitStateEntity} in the wait-state index when a
+ * process element's waiting state changes (e.g. job migrated, retries updated). Uses upsert so the
  * document is created if it was never written by an add handler (e.g. on replay after restart).
  *
  * @param <R> the record value type handled by the injected transformer
@@ -45,7 +46,13 @@ public class WaitStateUpdateHandler<R extends RecordValue & WaitStateRelated>
   @Override
   public void flush(final WaitStateEntity entity, final BatchRequest batchRequest)
       throws PersistenceException {
-    batchRequest.upsert(
-        indexName, entity.getId(), entity, Map.of(WaitStateTemplate.DETAILS, entity.getDetails()));
+    final Map<String, Object> updateFields = new HashMap<>();
+    // elementId is null for FAILED/RETRIES_UPDATED (transformer nulls it to avoid overwriting the
+    // stored value with the NO_CATCH_EVENT_FOUND sentinel); present and updated for MIGRATED.
+    if (entity.getElementId() != null) {
+      updateFields.put(WaitStateTemplate.ELEMENT_ID, entity.getElementId());
+    }
+    updateFields.put(WaitStateTemplate.DETAILS, entity.getDetails());
+    batchRequest.upsert(indexName, entity.getId(), entity, updateFields);
   }
 }
