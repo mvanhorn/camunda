@@ -20,7 +20,8 @@ public enum ResourceIntent implements Intent {
   DELETED((short) 1),
   FETCH((short) 2),
   FETCHED((short) 3),
-  REEXPORTED((short) 4);
+  REEXPORTED((short) 4),
+  DELETE((short) 5);
 
   private final short value;
 
@@ -44,6 +45,8 @@ public enum ResourceIntent implements Intent {
         return FETCHED;
       case 4:
         return REEXPORTED;
+      case 5:
+        return DELETE;
       default:
         return UNKNOWN;
     }

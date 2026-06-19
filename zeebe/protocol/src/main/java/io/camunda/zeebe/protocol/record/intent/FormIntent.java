@@ -17,7 +17,8 @@ package io.camunda.zeebe.protocol.record.intent;
 
 public enum FormIntent implements Intent {
   CREATED((short) 0),
-  DELETED((short) 1);
+  DELETED((short) 1),
+  DELETE((short) 2);
 
   private final short value;
 
@@ -35,6 +36,8 @@ public enum FormIntent implements Intent {
         return CREATED;
       case 1:
         return DELETED;
+      case 2:
+        return DELETE;
       default:
         return UNKNOWN;
     }
@@ -47,6 +50,12 @@ public enum FormIntent implements Intent {
 
   @Override
   public boolean isEvent() {
-    return true;
+    switch (this) {
+      case CREATED:
+      case DELETED:
+        return true;
+      default:
+        return false;
+    }
   }
 }
