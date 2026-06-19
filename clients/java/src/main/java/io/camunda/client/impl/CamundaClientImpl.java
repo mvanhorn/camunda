@@ -154,6 +154,7 @@ import io.camunda.client.api.fetch.UserTaskGetRequest;
 import io.camunda.client.api.fetch.VariableGetRequest;
 import io.camunda.client.api.response.ActivatedJob;
 import io.camunda.client.api.response.DocumentReferenceResponse;
+import io.camunda.client.api.search.request.AgentInstanceHistorySearchRequest;
 import io.camunda.client.api.search.request.AgentInstanceSearchRequest;
 import io.camunda.client.api.search.request.AuditLogSearchRequest;
 import io.camunda.client.api.search.request.BatchOperationItemSearchRequest;
@@ -339,6 +340,7 @@ import io.camunda.client.impl.fetch.UserTaskGetRequestImpl;
 import io.camunda.client.impl.fetch.VariableGetRequestImpl;
 import io.camunda.client.impl.http.HttpClient;
 import io.camunda.client.impl.http.HttpClientFactory;
+import io.camunda.client.impl.search.request.AgentInstanceHistorySearchRequestImpl;
 import io.camunda.client.impl.search.request.AgentInstanceSearchRequestImpl;
 import io.camunda.client.impl.search.request.AuditLogSearchRequestImpl;
 import io.camunda.client.impl.search.request.AuthorizationsSearchRequestImpl;
@@ -1781,6 +1783,12 @@ public final class CamundaClientImpl implements CamundaClient {
   @Override
   public AgentInstanceSearchRequest newAgentInstanceSearchRequest() {
     return new AgentInstanceSearchRequestImpl(httpClient, jsonMapper);
+  }
+
+  @Override
+  public AgentInstanceHistorySearchRequest newAgentInstanceHistorySearchRequest(
+      final long agentInstanceKey) {
+    return new AgentInstanceHistorySearchRequestImpl(agentInstanceKey, httpClient, jsonMapper);
   }
 
   private JobClient newJobClient() {
