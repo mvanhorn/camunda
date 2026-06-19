@@ -39,9 +39,11 @@ import io.camunda.qa.util.multidb.MultiDbTestApplication;
 import io.camunda.zeebe.model.bpmn.Bpmn;
 import io.camunda.zeebe.protocol.impl.record.value.job.JobRecord;
 import io.camunda.zeebe.qa.util.cluster.TestStandaloneBroker;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
@@ -126,6 +128,16 @@ class AgentInstanceAuthorizationIT {
     waitForAgentInstanceToBeIndexed(adminClient, agentInstanceKey1);
     waitForAgentInstanceToBeIndexed(adminClient, agentInstanceKey2);
     waitForAgentInstanceToBeIndexed(adminClient, agentInstanceKey3);
+
+    adminClient
+        .newCreateAgentHistoryItemCommand(agentInstanceKey1)
+        .elementInstanceKey(elementInstanceKey1)
+        .jobKey(jobKey1)
+        .role(AgentHistoryRole.USER)
+        .content(List.of(AgentHistoryContent.text("hello")))
+        .producedAt(OffsetDateTime.parse("2025-06-01T12:00:00Z"))
+        .execute();
+    waitForHistoryItemsToBeIndexed(adminClient, agentInstanceKey1, 1);
   }
 
   // ── search ────────────────────────────────────────────────────────────────
@@ -323,7 +335,46 @@ class AgentInstanceAuthorizationIT {
         .satisfies(ex -> assertThat(((ProblemException) ex).code()).isNotEqualTo(403));
   }
 
+  // ── searchHistory ─────────────────────────────────────────────────────────
+
+  @Test
+  @DisabledIfSystemProperty(named = "test.integration.camunda.database.type", matches = "rdbms.*$")
+  void searchHistoryShouldReturnHistoryForAuthorizedUser(
+      @Authenticated(USER1) final CamundaClient camundaClient) {
+    // user1 has READ_PROCESS_INSTANCE on PROCESS_ID_1
+    final var result =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKey1).execute();
+
+    assertThat(result.items()).isNotEmpty();
+    assertThat(result.items())
+        .allSatisfy(item -> assertThat(item.getAgentInstanceKey()).isEqualTo(agentInstanceKey1));
+  }
+
+  @Test
+  @DisabledIfSystemProperty(named = "test.integration.camunda.database.type", matches = "rdbms.*$")
+  void searchHistoryShouldReturnEmptyForUnauthorizedUser(
+      @Authenticated(USER1) final CamundaClient camundaClient) {
+    // user1 has no READ_PROCESS_INSTANCE on PROCESS_ID_2
+    final var result =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKey2).execute();
+
+    assertThat(result.items()).isEmpty();
+  }
+
   // ── helpers ───────────────────────────────────────────────────────────────
+
+  private static void waitForHistoryItemsToBeIndexed(
+      final CamundaClient client, final long agentInstanceKey, final int expectedCount) {
+    Awaitility.await("agent history indexed for key " + agentInstanceKey)
+        .atMost(Duration.ofSeconds(30))
+        .ignoreExceptions()
+        .untilAsserted(
+            () -> {
+              final var response =
+                  client.newAgentInstanceHistorySearchRequest(agentInstanceKey).execute();
+              assertThat(response.items()).hasSizeGreaterThanOrEqualTo(expectedCount);
+            });
+  }
 
   private static AgentInstanceCreationResult createAgentInstance(
       final CamundaClient adminClient, final String processId) {

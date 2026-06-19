@@ -28,8 +28,10 @@ import io.camunda.zeebe.model.bpmn.Bpmn;
 import io.camunda.zeebe.model.bpmn.BpmnModelInstance;
 import io.camunda.zeebe.protocol.impl.record.value.job.JobRecord;
 import io.camunda.zeebe.qa.util.cluster.TestStandaloneBroker;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
@@ -66,7 +68,9 @@ public class AgentInstanceTenancyIT {
 
   private static long agentInstanceKeyA;
   private static long agentInstanceKeyB;
+  private static long elementInstanceKeyA;
   private static long elementInstanceKeyB;
+  private static long jobKeyA;
   private static long jobKeyB;
 
   @BeforeAll
@@ -89,7 +93,11 @@ public class AgentInstanceTenancyIT {
     deployProcessForTenant(adminClient, processModel, TENANT_A);
     deployProcessForTenant(adminClient, processModel, TENANT_B);
 
-    agentInstanceKeyA = createAgentInstance(adminClient, TENANT_A);
+    final var resultA = createAgentInstanceWithResult(adminClient, TENANT_A);
+    agentInstanceKeyA = resultA.agentInstanceKey();
+    elementInstanceKeyA = resultA.elementInstanceKey();
+    jobKeyA = resultA.jobKey();
+
     final var resultB = createAgentInstanceWithResult(adminClient, TENANT_B);
     agentInstanceKeyB = resultB.agentInstanceKey();
     elementInstanceKeyB = resultB.elementInstanceKey();
@@ -97,6 +105,25 @@ public class AgentInstanceTenancyIT {
 
     waitForAgentInstanceToBeIndexed(adminClient, agentInstanceKeyA);
     waitForAgentInstanceToBeIndexed(adminClient, agentInstanceKeyB);
+
+    adminClient
+        .newCreateAgentHistoryItemCommand(agentInstanceKeyA)
+        .elementInstanceKey(elementInstanceKeyA)
+        .jobKey(jobKeyA)
+        .role(AgentHistoryRole.USER)
+        .content(List.of(AgentHistoryContent.text("Hello from " + TENANT_A)))
+        .producedAt(OffsetDateTime.parse("2025-06-01T12:00:00Z"))
+        .execute();
+    adminClient
+        .newCreateAgentHistoryItemCommand(agentInstanceKeyB)
+        .elementInstanceKey(elementInstanceKeyB)
+        .jobKey(jobKeyB)
+        .role(AgentHistoryRole.USER)
+        .content(List.of(AgentHistoryContent.text("Hello from " + TENANT_B)))
+        .producedAt(OffsetDateTime.parse("2025-06-01T12:00:00Z"))
+        .execute();
+    waitForHistoryItemsToBeIndexed(adminClient, agentInstanceKeyA, 1);
+    waitForHistoryItemsToBeIndexed(adminClient, agentInstanceKeyB, 1);
   }
 
   // ── search ────────────────────────────────────────────────────────────────
@@ -218,6 +245,48 @@ public class AgentInstanceTenancyIT {
     assertThat(exception.details().getStatus()).isEqualTo(404);
   }
 
+  // ── searchHistory ─────────────────────────────────────────────────────────
+
+  @Test
+  @DisabledIfSystemProperty(named = "test.integration.camunda.database.type", matches = "rdbms.*$")
+  void searchHistoryShouldReturnOnlyTenantAHistoryForUser1(
+      @Authenticated(USER1) final CamundaClient camundaClient) {
+    // user1 belongs to TENANT_A only
+    final var resultA =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKeyA).execute();
+    final var resultB =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKeyB).execute();
+
+    assertThat(resultA.items()).isNotEmpty();
+    assertThat(resultB.items()).isEmpty();
+  }
+
+  @Test
+  @DisabledIfSystemProperty(named = "test.integration.camunda.database.type", matches = "rdbms.*$")
+  void searchHistoryShouldReturnAllHistoryForAdmin(
+      @Authenticated(ADMIN) final CamundaClient camundaClient) {
+    final var resultA =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKeyA).execute();
+    final var resultB =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKeyB).execute();
+
+    assertThat(resultA.items()).isNotEmpty();
+    assertThat(resultB.items()).isNotEmpty();
+  }
+
+  @Test
+  @DisabledIfSystemProperty(named = "test.integration.camunda.database.type", matches = "rdbms.*$")
+  void searchHistoryShouldReturnEmptyForUserWithNoTenant(
+      @Authenticated(USER2) final CamundaClient camundaClient) {
+    final var resultA =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKeyA).execute();
+    final var resultB =
+        camundaClient.newAgentInstanceHistorySearchRequest(agentInstanceKeyB).execute();
+
+    assertThat(resultA.items()).isEmpty();
+    assertThat(resultB.items()).isEmpty();
+  }
+
   // ── createHistoryItem ─────────────────────────────────────────────────────
 
   @Test
@@ -247,6 +316,19 @@ public class AgentInstanceTenancyIT {
 
   // ── helpers ───────────────────────────────────────────────────────────────
 
+  private static void waitForHistoryItemsToBeIndexed(
+      final CamundaClient client, final long agentInstanceKey, final int expectedCount) {
+    Awaitility.await("agent history indexed for key " + agentInstanceKey)
+        .atMost(Duration.ofSeconds(30))
+        .ignoreExceptions()
+        .untilAsserted(
+            () -> {
+              final var response =
+                  client.newAgentInstanceHistorySearchRequest(agentInstanceKey).execute();
+              assertThat(response.items()).hasSizeGreaterThanOrEqualTo(expectedCount);
+            });
+  }
+
   private static void createTenant(final CamundaClient client, final String tenantId) {
     client.newCreateTenantCommand().tenantId(tenantId).name(tenantId).send().join();
   }
@@ -260,10 +342,6 @@ public class AgentInstanceTenancyIT {
       final CamundaClient client, final BpmnModelInstance model, final String tenantId) {
     final String filename = PROCESS_ID + "-" + tenantId + ".bpmn";
     deployProcessForTenantAndWaitForIt(client, model, filename, tenantId);
-  }
-
-  private static long createAgentInstance(final CamundaClient client, final String tenantId) {
-    return createAgentInstanceWithResult(client, tenantId).agentInstanceKey();
   }
 
   private static AgentInstanceCreationResult createAgentInstanceWithResult(
