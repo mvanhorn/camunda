@@ -15,9 +15,11 @@
  */
 package io.camunda.client.impl.search.response;
 
+import io.camunda.client.api.response.DocumentReferenceResponse;
 import io.camunda.client.api.search.enums.AgentInstanceHistoryCommitStatus;
 import io.camunda.client.api.search.enums.AgentInstanceHistoryRole;
 import io.camunda.client.api.search.response.AgentInstanceHistory;
+import io.camunda.client.impl.response.DocumentReferenceResponseImpl;
 import io.camunda.client.impl.util.EnumUtil;
 import io.camunda.client.impl.util.ParseUtil;
 import io.camunda.client.protocol.rest.AgentInstanceDocumentContent;
@@ -27,6 +29,7 @@ import io.camunda.client.protocol.rest.AgentInstanceMessageContent;
 import io.camunda.client.protocol.rest.AgentInstanceObjectContent;
 import io.camunda.client.protocol.rest.AgentInstanceTextContent;
 import io.camunda.client.protocol.rest.AgentInstanceToolCall;
+import io.camunda.client.protocol.rest.DocumentReference;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -174,15 +177,18 @@ public class AgentInstanceHistoryImpl implements AgentInstanceHistory {
 
   private static class DocumentContentImpl extends ContentImpl implements DocumentContent {
 
-    private final Object documentReference;
+    private final DocumentReferenceResponse documentReference;
 
     DocumentContentImpl(final AgentInstanceDocumentContent proto) {
       super(proto);
-      documentReference = proto.getDocumentReference();
+      documentReference =
+          proto.getDocumentReference() != null
+              ? new DocumentReferenceResponseImpl((DocumentReference) proto.getDocumentReference())
+              : null;
     }
 
     @Override
-    public Object getDocumentReference() {
+    public DocumentReferenceResponse getDocumentReference() {
       return documentReference;
     }
   }

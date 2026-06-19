@@ -15,6 +15,7 @@
  */
 package io.camunda.client.api.search.response;
 
+import io.camunda.client.api.response.DocumentReferenceResponse;
 import io.camunda.client.api.search.enums.AgentInstanceHistoryCommitStatus;
 import io.camunda.client.api.search.enums.AgentInstanceHistoryRole;
 import java.time.OffsetDateTime;
@@ -56,12 +57,9 @@ public interface AgentInstanceHistory {
     String getText();
   }
 
-  /**
-   * Camunda Document Store reference content block ({@code contentType = "DOCUMENT"}). Returns the
-   * raw document reference object; typed client support for documents is a follow-up.
-   */
+  /** Camunda Document Store reference content block ({@code contentType = "DOCUMENT"}). */
   interface DocumentContent extends Content {
-    Object getDocumentReference();
+    DocumentReferenceResponse getDocumentReference();
   }
 
   /** Arbitrary structured content block ({@code contentType = "OBJECT"}). */
