@@ -13,12 +13,15 @@ import io.camunda.configuration.beans.SearchEngineIndexProperties;
 import io.camunda.configuration.beans.SearchEngineRetentionProperties;
 import io.camunda.configuration.beans.SearchEngineSchemaManagerProperties;
 import io.camunda.configuration.conditions.ConditionalOnSecondaryStorageType;
+import io.camunda.operate.property.OperateProperties;
 import io.camunda.search.connect.configuration.DatabaseConfig;
 import io.camunda.search.connect.configuration.DatabaseType;
 import io.camunda.search.schema.config.SearchEngineConfiguration;
+import io.camunda.tasklist.property.TasklistProperties;
 import io.camunda.zeebe.broker.Broker;
 import io.camunda.zeebe.broker.system.configuration.BrokerCfg;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,10 +39,41 @@ public class SearchEngineDatabaseConfiguration {
       final MeterRegistry meterRegistry,
       @Autowired(required = false)
           final Broker broker, // if present, then it will ensure that the broker is started first
-      @Autowired(required = false) final BrokerCfg brokerCfg) {
+      @Autowired(required = false) final BrokerCfg brokerCfg,
+      @Autowired(required = false) final OperateProperties operateProperties,
+      @Autowired(required = false) final TasklistProperties tasklistProperties) {
     final boolean isGatewayEnabled = brokerCfg == null || brokerCfg.getGateway().isEnable();
+    final boolean healthCheckEnabled =
+        resolveHealthCheckEnabled(searchEngineConfiguration, operateProperties, tasklistProperties);
     return new SearchEngineSchemaInitializer(
-        searchEngineConfiguration, meterRegistry, isGatewayEnabled);
+        searchEngineConfiguration, meterRegistry, isGatewayEnabled, healthCheckEnabled);
+  }
+
+  private static boolean resolveHealthCheckEnabled(
+      final SearchEngineConfiguration config,
+      final @Nullable OperateProperties operateProperties,
+      final @Nullable TasklistProperties tasklistProperties) {
+    // Unified property takes precedence if explicitly set
+    final Boolean unified = config.schemaManager().getHealthCheckEnabled();
+    if (unified != null) {
+      return unified;
+    }
+    // Fall back to legacy per-module properties; AND semantics: any false disables the check
+    final boolean isEs = config.connect().getTypeEnum().isElasticSearch();
+    boolean effective = true;
+    if (operateProperties != null) {
+      effective &=
+          isEs
+              ? operateProperties.getElasticsearch().isHealthCheckEnabled()
+              : operateProperties.getOpensearch().isHealthCheckEnabled();
+    }
+    if (tasklistProperties != null) {
+      effective &=
+          isEs
+              ? tasklistProperties.getElasticsearch().isHealthCheckEnabled()
+              : tasklistProperties.getOpenSearch().isHealthCheckEnabled();
+    }
+    return effective;
   }
 
   @Bean

@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 class SearchEngineSchemaInitializerTest {
 
   private SearchEngineSchemaInitializer createInitializer() {
-    return new SearchEngineSchemaInitializer(null, new SimpleMeterRegistry(), true);
+    return new SearchEngineSchemaInitializer(null, new SimpleMeterRegistry(), true, true);
   }
 
   /** Sets the private {@code isShutdown} flag on the initializer via reflection. */

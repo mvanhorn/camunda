@@ -9,6 +9,7 @@ package io.camunda.search.schema.config;
 
 import io.camunda.zeebe.util.retry.RetryConfiguration;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 
 public class SchemaManagerConfiguration {
 
@@ -16,6 +17,7 @@ public class SchemaManagerConfiguration {
   private SchemaManagerRetryConfiguration retry = new SchemaManagerRetryConfiguration();
   private boolean versionCheckRestrictionEnabled = true;
   private boolean performCleanup = false;
+  private @Nullable Boolean healthCheckEnabled;
 
   public boolean isCreateSchema() {
     return isCreateSchema;
@@ -47,6 +49,14 @@ public class SchemaManagerConfiguration {
 
   public void setPerformCleanup(final boolean performCleanup) {
     this.performCleanup = performCleanup;
+  }
+
+  public @Nullable Boolean getHealthCheckEnabled() {
+    return healthCheckEnabled;
+  }
+
+  public void setHealthCheckEnabled(final @Nullable Boolean healthCheckEnabled) {
+    this.healthCheckEnabled = healthCheckEnabled;
   }
 
   public static class SchemaManagerRetryConfiguration extends RetryConfiguration {

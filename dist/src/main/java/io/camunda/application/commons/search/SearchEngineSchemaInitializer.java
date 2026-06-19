@@ -14,6 +14,7 @@ import io.camunda.search.schema.config.SearchEngineConfiguration;
 import io.camunda.search.schema.metrics.SchemaManagerMetrics;
 import io.camunda.webapps.schema.descriptors.IndexDescriptors;
 import io.camunda.zeebe.util.VisibleForTesting;
+import io.camunda.zeebe.util.retry.RetryDecorator;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
@@ -29,16 +30,19 @@ public class SearchEngineSchemaInitializer implements InitializingBean, SchemaMa
   private final SearchEngineConfiguration searchEngineConfiguration;
   private final SchemaManagerMetrics schemaManagerMetrics;
   private final boolean awaitSchemaInitialization;
+  private final boolean healthCheckEnabled;
   private final AtomicBoolean isShutdown = new AtomicBoolean(false);
   private final AtomicBoolean initialized = new AtomicBoolean(false);
 
   public SearchEngineSchemaInitializer(
       final SearchEngineConfiguration searchEngineConfiguration,
       final MeterRegistry meterRegistry,
-      final boolean awaitSchemaInitialization) {
+      final boolean awaitSchemaInitialization,
+      final boolean healthCheckEnabled) {
     this.searchEngineConfiguration = searchEngineConfiguration;
     schemaManagerMetrics = new SchemaManagerMetrics(meterRegistry);
     this.awaitSchemaInitialization = awaitSchemaInitialization;
+    this.healthCheckEnabled = healthCheckEnabled;
   }
 
   @Override
@@ -114,6 +118,19 @@ public class SearchEngineSchemaInitializer implements InitializingBean, SchemaMa
                     clientAdapter.objectMapper())
                 .withMetrics(schemaManagerMetrics)) {
       schemaManager.startup();
+      if (healthCheckEnabled) {
+        try {
+          new RetryDecorator(searchEngineConfiguration.schemaManager().getRetry())
+              .decorate(
+                  "cluster health check after schema init",
+                  clientAdapter.getSearchEngineClient()::isHealthy,
+                  healthy -> !healthy);
+        } catch (final Exception e) {
+          LOGGER.warn(
+              "Cluster health check failed after schema init; not declaring schema as ready", e);
+          return;
+        }
+      }
       initialized.set(true);
     } catch (final IOException e) {
       LOGGER.debug("Failed to close the search client", e);
