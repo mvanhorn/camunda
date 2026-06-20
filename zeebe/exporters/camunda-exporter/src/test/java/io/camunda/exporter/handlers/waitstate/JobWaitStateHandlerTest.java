@@ -84,7 +84,7 @@ class JobWaitStateHandlerTest {
   }
 
   @Test
-  void shouldAddHandlerHandleCreatedAndRemoveHandlerNotHandle() {
+  void shouldAddHandlerAcceptCreatedRecordOnly() {
     // given
     final var created = jobRecord(JobIntent.CREATED);
     final var completed = jobRecord(JobIntent.COMPLETED);
@@ -199,7 +199,7 @@ class JobWaitStateHandlerTest {
   }
 
   @Test
-  void shouldAddHandlerNotHandleMigratedEvent() {
+  void shouldUpdateHandlerAcceptMigratedEventNotAddHandler() {
     // given
     final var migrated = jobRecord(JobIntent.MIGRATED);
 
@@ -263,7 +263,7 @@ class JobWaitStateHandlerTest {
   }
 
   @Test
-  void shouldUpdateHandlerHandleFailedAndRetriesUpdated() {
+  void shouldUpdateHandlerAcceptFailedAndRetriesUpdated() {
     // given
     final var failed = jobRecord(JobIntent.FAILED);
     final var retriesUpdated = jobRecord(JobIntent.RETRIES_UPDATED);
@@ -276,7 +276,7 @@ class JobWaitStateHandlerTest {
   }
 
   @Test
-  void shouldUpdateHandlerFlushWithDetailsOnlyWhenElementIdIsNull() throws PersistenceException {
+  void shouldUpdateHandlerSkipsElementIdWhenNullDueToSentinelRisk() throws PersistenceException {
     // given — FAILED/RETRIES_UPDATED: transformer nulls elementId to avoid overwriting stored value
     final var id = String.valueOf(JOB_KEY);
     final var entity = new WaitStateEntity().setId(id).setDetails("{\"retries\":0}");
@@ -295,8 +295,7 @@ class JobWaitStateHandlerTest {
   }
 
   @Test
-  void shouldUpdateHandlerFlushWithElementIdAndDetailsWhenElementIdIsPresent()
-      throws PersistenceException {
+  void shouldUpdateHandlerIncludesElementIdWhenPresentForMigration() throws PersistenceException {
     // given — MIGRATED: elementId is populated with the new element id
     final var id = String.valueOf(JOB_KEY);
     final var entity =

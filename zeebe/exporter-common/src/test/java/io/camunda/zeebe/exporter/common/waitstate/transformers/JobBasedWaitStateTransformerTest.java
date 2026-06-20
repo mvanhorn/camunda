@@ -22,6 +22,8 @@ import io.camunda.zeebe.protocol.record.value.JobRecordValue;
 import io.camunda.zeebe.protocol.record.value.TenantOwned;
 import io.camunda.zeebe.test.broker.protocol.ProtocolFactory;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class JobBasedWaitStateTransformerTest {
 
@@ -228,57 +230,43 @@ class JobBasedWaitStateTransformerTest {
     assertThat(transformer.triggersAdd(canceled)).isFalse();
   }
 
-  @Test
+  @ParameterizedTest
+  @EnumSource(
+      value = JobIntent.class,
+      names = {"FAILED", "RETRIES_UPDATED"})
   @SuppressWarnings("unchecked")
-  void shouldTriggerUpdateOnJobFailedAndRetriesUpdated() {
+  void shouldTriggerUpdateForSentinelRiskIntents(final JobIntent intent) {
     // given
-    final Record<JobRecordValue> failed =
+    final Record<JobRecordValue> record =
         (Record<JobRecordValue>)
             (Record<?>)
                 factory.generateRecord(
-                    ValueType.JOB,
-                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.FAILED));
-    final Record<JobRecordValue> retriesUpdated =
-        (Record<JobRecordValue>)
-            (Record<?>)
-                factory.generateRecord(
-                    ValueType.JOB,
-                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.RETRIES_UPDATED));
+                    ValueType.JOB, r -> r.withRecordType(RecordType.EVENT).withIntent(intent));
 
     // when / then
-    assertThat(transformer.triggersUpdate(failed)).isTrue();
-    assertThat(transformer.triggersUpdate(retriesUpdated)).isTrue();
-    assertThat(transformer.triggersAdd(failed)).isFalse();
-    assertThat(transformer.triggersRemoval(failed)).isFalse();
-    assertThat(transformer.triggersAdd(retriesUpdated)).isFalse();
-    assertThat(transformer.triggersRemoval(retriesUpdated)).isFalse();
+    assertThat(transformer.triggersUpdate(record)).isTrue();
+    assertThat(transformer.triggersAdd(record)).isFalse();
+    assertThat(transformer.triggersRemoval(record)).isFalse();
   }
 
-  @Test
+  @ParameterizedTest
+  @EnumSource(
+      value = JobIntent.class,
+      names = {"FAILED", "RETRIES_UPDATED"})
   @SuppressWarnings("unchecked")
-  void shouldNullOutElementIdForFailedAndRetriesUpdatedToAvoidSentinelCorruption() {
-    // given — FAILED and RETRIES_UPDATED may carry "NO_CATCH_EVENT_FOUND" as elementId;
-    // the transformer must null it out so update handlers preserve the stored value.
-    final Record<JobRecordValue> failed =
+  void shouldClearElementIdForSentinelRiskIntents(final JobIntent intent) {
+    // given
+    final Record<JobRecordValue> record =
         (Record<JobRecordValue>)
             (Record<?>)
                 factory.generateRecord(
-                    ValueType.JOB,
-                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.FAILED));
-    final Record<JobRecordValue> retriesUpdated =
-        (Record<JobRecordValue>)
-            (Record<?>)
-                factory.generateRecord(
-                    ValueType.JOB,
-                    r -> r.withRecordType(RecordType.EVENT).withIntent(JobIntent.RETRIES_UPDATED));
+                    ValueType.JOB, r -> r.withRecordType(RecordType.EVENT).withIntent(intent));
 
     // when
-    final var failedEntry = transformer.transform(failed);
-    final var retriesUpdatedEntry = transformer.transform(retriesUpdated);
+    final var entry = transformer.transform(record);
 
-    // then
-    assertThat(failedEntry.getElementId()).isNull();
-    assertThat(retriesUpdatedEntry.getElementId()).isNull();
+    // then — elementId is null so update handlers preserve the stored value
+    assertThat(entry.getElementId()).isNull();
   }
 
   @Test

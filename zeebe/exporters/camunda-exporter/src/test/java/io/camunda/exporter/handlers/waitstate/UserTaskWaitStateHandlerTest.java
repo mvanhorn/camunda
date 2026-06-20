@@ -82,7 +82,7 @@ class UserTaskWaitStateHandlerTest {
   }
 
   @Test
-  void shouldAddHandlerHandleCreatedAndRemoveHandlerNotHandle() {
+  void shouldAddHandlerAcceptCreatedRecordOnly() {
     // given
     final var created = userTaskRecord(UserTaskIntent.CREATED);
     final var completed = userTaskRecord(UserTaskIntent.COMPLETED);
@@ -95,7 +95,7 @@ class UserTaskWaitStateHandlerTest {
   }
 
   @Test
-  void shouldAddHandlerNotHandleMigratedOrUpdatedEvents() {
+  void shouldUpdateHandlerAcceptMigratedAndUpdatedNotAddHandler() {
     // given
     final var migrated = userTaskRecord(UserTaskIntent.MIGRATED);
     final var updated = userTaskRecord(UserTaskIntent.UPDATED);
@@ -217,7 +217,7 @@ class UserTaskWaitStateHandlerTest {
   }
 
   @Test
-  void shouldUpdateHandlerFlushWithDetailsOnlyWhenElementIdIsNull() throws PersistenceException {
+  void shouldUpdateHandlerSkipsElementIdWhenNull() throws PersistenceException {
     // given — elementId null means no migration, only task metadata changed
     final var id = String.valueOf(USER_TASK_KEY);
     final var entity = new WaitStateEntity().setId(id).setDetails("{\"taskKey\":999}");
@@ -236,8 +236,7 @@ class UserTaskWaitStateHandlerTest {
   }
 
   @Test
-  void shouldUpdateHandlerFlushWithElementIdAndDetailsWhenElementIdIsPresent()
-      throws PersistenceException {
+  void shouldUpdateHandlerIncludesElementIdWhenPresentForMigration() throws PersistenceException {
     // given — MIGRATED: elementId is populated with the new element id
     final var id = String.valueOf(USER_TASK_KEY);
     final var entity =

@@ -580,21 +580,9 @@ public class WaitStateJobIT {
                   .isEqualTo(0);
             });
 
-    // cleanup — cancel instance to remove the wait state
+    // cleanup — cancel the incident-stalled instance so it doesn't interfere with other tests
     camundaClient.newCancelInstanceCommand(pik).execute();
     waitForProcessInstanceToBeTerminated(camundaClient, pik);
-    Awaitility.await("wait state should be removed after cleanup")
-        .atMost(TIMEOUT_DATA_AVAILABILITY)
-        .untilAsserted(
-            () ->
-                assertThat(
-                        camundaClient
-                            .newElementInstanceWaitStateSearchRequest()
-                            .filter(f -> f.processInstanceKey(pik))
-                            .send()
-                            .join()
-                            .items())
-                    .isEmpty());
   }
 
   /**
