@@ -29,11 +29,7 @@ public class JobBasedWaitStateTransformer implements WaitStateTransformer<JobRec
   @Override
   public void extract(final Record<JobRecordValue> record, final WaitStateEntry entry) {
     final JobRecordValue value = record.getValue();
-    // FAILED and RETRIES_UPDATED may carry "NO_CATCH_EVENT_FOUND" as elementId when a BPMN error
-    // has no catch event. Null it out so update handlers preserve the stored elementId instead.
-    if (record.getIntent() == JobIntent.FAILED || record.getIntent() == JobIntent.RETRIES_UPDATED) {
-      entry.setElementId(null);
-    }
+    clearElementIdIfSentinelRisk(record, entry);
     entry
         .setElementType(value.getElementType())
         .setDetails(
@@ -43,6 +39,18 @@ public class JobBasedWaitStateTransformer implements WaitStateTransformer<JobRec
                 value.getJobKind(),
                 listenerEventType(value),
                 value.getRetries()));
+  }
+
+  /**
+   * FAILED and RETRIES_UPDATED records may carry "NO_CATCH_EVENT_FOUND" as elementId when a BPMN
+   * error has no matching catch event. Nulling elementId here prevents update handlers from
+   * overwriting the stored elementId with that sentinel value.
+   */
+  private static void clearElementIdIfSentinelRisk(
+      final Record<JobRecordValue> record, final WaitStateEntry entry) {
+    if (record.getIntent() == JobIntent.FAILED || record.getIntent() == JobIntent.RETRIES_UPDATED) {
+      entry.setElementId(null);
+    }
   }
 
   private static @Nullable JobListenerEventType listenerEventType(final JobRecordValue value) {

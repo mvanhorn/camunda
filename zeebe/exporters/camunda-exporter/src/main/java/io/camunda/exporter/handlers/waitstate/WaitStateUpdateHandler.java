@@ -47,8 +47,8 @@ public class WaitStateUpdateHandler<R extends RecordValue & WaitStateRelated>
   public void flush(final WaitStateEntity entity, final BatchRequest batchRequest)
       throws PersistenceException {
     final Map<String, Object> updateFields = new HashMap<>();
-    // elementId is null for FAILED/RETRIES_UPDATED (transformer nulls it to avoid overwriting the
-    // stored value with the NO_CATCH_EVENT_FOUND sentinel); present and updated for MIGRATED.
+    // elementId is null when the transformer called clearElementIdIfSentinelRisk() (e.g. FAILED /
+    // RETRIES_UPDATED); include it only when explicitly set (e.g. MIGRATED).
     if (entity.getElementId() != null) {
       updateFields.put(WaitStateTemplate.ELEMENT_ID, entity.getElementId());
     }
