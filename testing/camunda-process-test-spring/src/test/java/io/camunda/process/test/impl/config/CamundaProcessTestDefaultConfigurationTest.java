@@ -17,11 +17,16 @@ package io.camunda.process.test.impl.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.camunda.client.CamundaClient;
 import io.camunda.client.CamundaClientBuilder;
 import io.camunda.client.CamundaClientConfiguration;
 import io.camunda.client.CredentialsProvider;
+import io.camunda.client.api.JsonMapper;
 import io.camunda.client.impl.CamundaClientEnvironmentVariables;
+import io.camunda.client.impl.CamundaObjectMapper;
 import io.camunda.client.impl.NoopCredentialsProvider;
 import io.camunda.client.impl.oauth.OAuthCredentialsProvider;
 import io.camunda.client.impl.util.Environment;
@@ -29,11 +34,18 @@ import io.camunda.client.spring.configuration.CamundaClientAllAutoConfiguration;
 import io.camunda.client.spring.configuration.MetricsDefaultConfiguration;
 import io.camunda.client.spring.testsupport.CamundaSpringProcessTestContext;
 import io.camunda.process.test.api.CamundaClientBuilderFactory;
+<<<<<<< HEAD
 import io.camunda.process.test.impl.configuration.CamundaProcessTestDefaultConfiguration;
 import io.camunda.process.test.impl.configuration.CamundaProcessTestRuntimeConfiguration;
 import io.camunda.process.test.impl.configuration.LegacyCamundaProcessTestRuntimeConfiguration;
+=======
+import io.camunda.process.test.impl.configuration.CamundaProcessTestAutoConfiguration;
+import io.camunda.process.test.impl.configuration.CamundaProcessTestRuntimeConfiguration;
+>>>>>>> 491023ab (test: merge CPT spring integration scenarios)
 import java.net.URI;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.Map;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -222,6 +234,84 @@ public class CamundaProcessTestDefaultConfigurationTest {
   }
 
   @Nested
+  @TestPropertySource(
+      properties = {
+        "camunda.process-test.connectors-enabled=true",
+        "camunda.process-test.camunda-docker-image-version=8.8.0-new",
+        "camunda.process-test.camunda-docker-image-name=camunda/camunda-new",
+        "io.camunda.process.test.camunda-docker-image-name=camunda/camunda-legacy",
+      })
+  class ShouldApplyRuntimeConfigurationWithNewPrefix {
+
+    @Autowired private CamundaProcessTestRuntimeConfiguration configuration;
+
+    @Test
+    void shouldReadConfigurationWithNewPrefix() {
+      assertThat(configuration.isConnectorsEnabled()).isTrue();
+      assertThat(configuration.getCamundaDockerImageVersion()).isEqualTo("8.8.0-new");
+      assertThat(configuration.getCamundaDockerImageName()).isEqualTo("camunda/camunda-new");
+    }
+  }
+
+  @Nested
+  @TestPropertySource(
+      properties = {
+        "io.camunda.process.test.connectors-enabled=true",
+        "io.camunda.process.test.camunda-docker-image-version=8.8.0-legacy",
+        "io.camunda.process.test.camunda-docker-image-name=camunda/camunda-legacy"
+      })
+  class ShouldApplyRuntimeConfigurationWithLegacyPrefix {
+
+    @Autowired private CamundaProcessTestRuntimeConfiguration configuration;
+
+    @Test
+    void shouldUseLegacyConfiguration() {
+      assertThat(configuration.isConnectorsEnabled()).isTrue();
+      assertThat(configuration.getCamundaDockerImageVersion()).isEqualTo("8.8.0-legacy");
+      assertThat(configuration.getCamundaDockerImageName()).isEqualTo("camunda/camunda-legacy");
+    }
+  }
+
+  @Nested
+  @ContextConfiguration(
+      classes = {
+        CamundaProcessTestAutoConfiguration.class,
+        CamundaProcessTestDefaultConfigurationTest.CustomJsonMapperConfig.class
+      })
+  class ShouldUseCustomJsonMapper {
+
+    @Autowired private CamundaClientBuilderFactory clientBuilderFactory;
+    @Autowired private JsonMapper jsonMapper;
+
+    @Test
+    void shouldApplyCustomJsonMapper() {
+      final CamundaClientConfiguration config = buildConfiguration();
+      final LocalDateTime createdDate = LocalDateTime.now();
+      final LocalDateTime modifiedDate = createdDate.plusMinutes(1);
+      final Map<String, Object> variables =
+          Map.of("bpt2", new BlueprintTest(1L, createdDate, modifiedDate, "testBusinessKey"));
+
+      final Map<String, Object> deserializedVariables =
+          config.getJsonMapper().fromJsonAsMap(config.getJsonMapper().toJson(variables));
+      final BlueprintTest blueprint =
+          config.getJsonMapper().transform(deserializedVariables.get("bpt2"), BlueprintTest.class);
+
+      assertThat(config.getJsonMapper()).isSameAs(jsonMapper);
+      assertThat(blueprint.getBusinessKey()).isEqualTo("testBusinessKey");
+      assertThat(blueprint.getId()).isEqualTo(1L);
+      assertThat(blueprint.getCreatedDate()).isEqualTo(createdDate);
+      assertThat(blueprint.getModifiedDate()).isEqualTo(modifiedDate);
+    }
+
+    private CamundaClientConfiguration buildConfiguration() {
+      final CamundaClientBuilder builder = clientBuilderFactory.get();
+      try (final CamundaClient client = builder.build()) {
+        return client.getConfiguration();
+      }
+    }
+  }
+
+  @Nested
   @ContextConfiguration(
       classes = {
         CamundaProcessTestDefaultConfigurationTest.TestConfig.class,
@@ -248,6 +338,7 @@ public class CamundaProcessTestDefaultConfigurationTest {
   }
 
   @Configuration
+<<<<<<< HEAD
   @Import(CamundaProcessTestDefaultConfiguration.class)
   @ImportAutoConfiguration({
     CamundaClientAllAutoConfiguration.class,
@@ -268,6 +359,68 @@ public class CamundaProcessTestDefaultConfigurationTest {
           CamundaClient.newClientBuilder()
               .restAddress(URI.create("http://custom-factory-host:9999"))
               .grpcAddress(URI.create("http://custom-factory-host:26500"));
+=======
+  static class CustomJsonMapperConfig {
+    @Bean
+    JsonMapper jsonMapper() {
+      final ObjectMapper objectMapper =
+          new ObjectMapper()
+              .configure(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT, true)
+              .registerModule(new JavaTimeModule());
+      return new CamundaObjectMapper(objectMapper);
+    }
+  }
+
+  private static class BlueprintTest {
+    private Long id;
+    private LocalDateTime createdDate;
+    private LocalDateTime modifiedDate;
+    private String businessKey;
+
+    BlueprintTest() {}
+
+    BlueprintTest(
+        final Long id,
+        final LocalDateTime createdDate,
+        final LocalDateTime modifiedDate,
+        final String businessKey) {
+      this.id = id;
+      this.createdDate = createdDate;
+      this.modifiedDate = modifiedDate;
+      this.businessKey = businessKey;
+    }
+
+    public Long getId() {
+      return id;
+    }
+
+    public void setId(final Long id) {
+      this.id = id;
+    }
+
+    public LocalDateTime getCreatedDate() {
+      return createdDate;
+    }
+
+    public void setCreatedDate(final LocalDateTime createdDate) {
+      this.createdDate = createdDate;
+    }
+
+    public LocalDateTime getModifiedDate() {
+      return modifiedDate;
+    }
+
+    public void setModifiedDate(final LocalDateTime modifiedDate) {
+      this.modifiedDate = modifiedDate;
+    }
+
+    public String getBusinessKey() {
+      return businessKey;
+    }
+
+    public void setBusinessKey(final String businessKey) {
+      this.businessKey = businessKey;
+>>>>>>> 491023ab (test: merge CPT spring integration scenarios)
     }
   }
 }
