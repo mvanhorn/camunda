@@ -58,7 +58,7 @@ public final class RaftPartitionFactory {
   public static Path getPartitionDirectory(
       final PartitionId partitionId, final String dataDirectory) {
     return Paths.get(dataDirectory)
-        .resolve(GROUP_NAME)
+        .resolve(partitionId.group())
         .resolve("partitions")
         .resolve(partitionId.id().toString());
   }
