@@ -49,6 +49,10 @@ import io.camunda.zeebe.engine.processing.identity.RoleDeleteProcessor;
 import io.camunda.zeebe.engine.processing.identity.RoleRemoveEntityProcessor;
 import io.camunda.zeebe.engine.processing.identity.RoleUpdateProcessor;
 import io.camunda.zeebe.engine.processing.message.MessageSubscriptionMigrateProcessor;
+import io.camunda.zeebe.engine.processing.resource.DecisionRequirementsDeleteProcessor;
+import io.camunda.zeebe.engine.processing.resource.FormDeleteProcessor;
+import io.camunda.zeebe.engine.processing.resource.ProcessDeleteProcessor;
+import io.camunda.zeebe.engine.processing.resource.ResourceDeleteProcessor;
 import io.camunda.zeebe.engine.processing.resource.ResourceDeletionDeleteProcessor;
 import io.camunda.zeebe.engine.processing.scaling.ScaleMarkPartitionBootstrappedProcessor;
 import io.camunda.zeebe.engine.processing.scaling.ScaleScaleUpProcessor;
@@ -143,13 +147,23 @@ public class CommandDistributionIdempotencyTest {
           .withEngineConfig(c -> c.setBatchOperationSchedulerInterval(Duration.ofDays(1)))
           .withSearchClientsProxy(SearchClientsProxy.noop());
 
+  // TODO on https://github.com/camunda/camunda/issues/55165
+  //  Remove this exclusion when they are wired and scenarios are added here.
+  private static final Set<Class<?>> UNWIRED_PROCESSORS =
+      Set.of(
+          DecisionRequirementsDeleteProcessor.class,
+          FormDeleteProcessor.class,
+          ProcessDeleteProcessor.class,
+          ResourceDeleteProcessor.class);
+
   private static final Set<Class<?>> DISTRIBUTING_PROCESSORS =
       new HashSet<>(
           ReflectionSupport.findAllClassesInPackage(
               "io.camunda.zeebe.engine.processing",
               c -> {
                 final var interfaces = c.getInterfaces();
-                return Arrays.asList(interfaces).contains(DistributedTypedRecordProcessor.class);
+                return Arrays.asList(interfaces).contains(DistributedTypedRecordProcessor.class)
+                    && !UNWIRED_PROCESSORS.contains(c);
               },
               ignored -> true));
 
