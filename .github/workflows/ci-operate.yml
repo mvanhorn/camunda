@@ -73,7 +73,7 @@ jobs:
       BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
       TEST_TYPE: Build
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
@@ -124,7 +124,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
         uses: ./.github/actions/print-metadata
@@ -201,7 +201,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
         uses: ./.github/actions/print-metadata
@@ -236,7 +236,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
         uses: ./.github/actions/print-metadata
@@ -257,6 +257,43 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
 
+<<<<<<< HEAD
+=======
+  operate-fe-prettier:
+    if: inputs.runFeTests
+    name: "Tool / Front End - Prettier"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {} # GITHUB_TOKEN unused in this job
+    env:
+      TEST_TYPE: Tool
+      TEST_PRODUCT: Operate
+    defaults:
+      run:
+        working-directory: operate/client
+    steps:
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Print metadata
+        uses: ./.github/actions/print-metadata
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+      - run: npm ci
+        name: Install dependencies
+      - run: npm run lint:prettier
+        name: Prettier
+      - name: Observe build status
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/observe-build-status
+        with:
+          build_status: ${{ job.status }}
+          secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
+          secret_vault_address: ${{ secrets.VAULT_ADDR }}
+          secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
+
+>>>>>>> ed1271e5 (ci: pin camunda/infra-global-github-actions to immutable SHAs)
   operate-fe-sbom-snyk:
     if: inputs.runFeTests
     name: "Tool / Front End - Snyk SBOM"
@@ -269,7 +306,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
         uses: ./.github/actions/print-metadata
@@ -317,7 +354,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - name: Check out repository code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
@@ -368,7 +405,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - name: Check out repository code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
@@ -414,7 +451,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - name: Check out repository code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
@@ -455,7 +492,7 @@ jobs:
       run:
         working-directory: operate/client
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@be5b0496892a83e6b3c5cedb818b771e8ed68121 # main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
         uses: ./.github/actions/print-metadata
