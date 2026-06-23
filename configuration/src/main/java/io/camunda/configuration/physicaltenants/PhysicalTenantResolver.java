@@ -96,6 +96,8 @@ public final class PhysicalTenantResolver implements PhysicalTenantIds {
       binder.bind(Camunda.PREFIX, Bindable.ofInstance(physicalTenant));
       binder.bind(
           PHYSICAL_TENANTS_PREFIX + "." + physicalTenantId, Bindable.ofInstance(physicalTenant));
+      physicalTenant.setDocument(
+          PhysicalTenantDocumentConfigurations.forPhysicalTenant(physicalTenantId, environment));
       resolvedPhysicalTenants.put(physicalTenantId, physicalTenant);
     }
     if (!resolvedPhysicalTenants.containsKey(PhysicalTenantIds.DEFAULT_PHYSICAL_TENANT_ID)) {
