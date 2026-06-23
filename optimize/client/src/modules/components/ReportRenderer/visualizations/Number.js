@@ -28,8 +28,11 @@ export function Number({report, formatter, mightFail, overlay}) {
   const processVariableReport = data.view.entity === 'variable';
   const isMultiMeasure = result?.measures.length > 1;
   // Optional per-report subtitle override (single-measure only, so one subtitle can't be
-  // ambiguously applied across several measures). Rendered outside the fitted container — see below.
-  const subtitleOverride = subtitle && !isMultiMeasure ? subtitle : null;
+  // ambiguously applied across several measures). Trimmed and blank-checked so a whitespace-only
+  // value does not suppress the normal label and render an empty subtitle. Rendered outside the
+  // fitted container — see below.
+  const trimmedSubtitle = subtitle?.trim();
+  const subtitleOverride = trimmedSubtitle && !isMultiMeasure ? trimmedSubtitle : null;
 
   useEffect(() => {
     // We need to load the variables in order to resolve the variable label
