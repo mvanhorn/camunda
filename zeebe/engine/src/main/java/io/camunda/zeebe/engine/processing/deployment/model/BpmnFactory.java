@@ -14,9 +14,12 @@ import io.camunda.zeebe.engine.EngineConfiguration;
 import io.camunda.zeebe.engine.processing.bpmn.clock.ZeebeFeelEngineClock;
 import io.camunda.zeebe.engine.processing.common.ExpressionProcessor;
 import io.camunda.zeebe.engine.processing.deployment.model.transformation.BpmnTransformer;
+import io.camunda.zeebe.engine.processing.deployment.model.transformation.TransformerSlot;
+import io.camunda.zeebe.engine.processing.deployment.model.transformation.VersionedTransformerCatalog;
 import io.camunda.zeebe.engine.processing.deployment.transform.BpmnValidator;
 import io.camunda.zeebe.engine.processing.deployment.transform.ValidationConfig;
 import java.time.InstantSource;
+import java.util.Map;
 
 public final class BpmnFactory {
 
@@ -34,9 +37,25 @@ public final class BpmnFactory {
       final InstantSource clock,
       final ExpressionLanguageMetrics expressionLanguageMetrics,
       final int maxNameFieldLength) {
+    return createTransformer(
+        clock,
+        expressionLanguageMetrics,
+        maxNameFieldLength,
+        VersionedTransformerCatalog.defaultCatalog(),
+        Map.of());
+  }
+
+  public static BpmnTransformer createTransformer(
+      final InstantSource clock,
+      final ExpressionLanguageMetrics expressionLanguageMetrics,
+      final int maxNameFieldLength,
+      final VersionedTransformerCatalog catalog,
+      final Map<TransformerSlot, Integer> slotVersions) {
     return new BpmnTransformer(
         createExpressionLanguage(new ZeebeFeelEngineClock(clock), expressionLanguageMetrics),
-        maxNameFieldLength);
+        maxNameFieldLength,
+        catalog,
+        slotVersions);
   }
 
   public static BpmnValidator createValidator(

@@ -39,10 +39,13 @@ import io.camunda.zeebe.engine.processing.deployment.model.transformer.StartEven
 import io.camunda.zeebe.engine.processing.deployment.model.transformer.SubProcessTransformer;
 import io.camunda.zeebe.engine.processing.deployment.model.transformer.UserTaskTransformer;
 import io.camunda.zeebe.model.bpmn.BpmnModelInstance;
+import io.camunda.zeebe.model.bpmn.instance.BpmnModelElementInstance;
 import io.camunda.zeebe.model.bpmn.instance.SendTask;
 import io.camunda.zeebe.model.bpmn.instance.ServiceTask;
 import io.camunda.zeebe.model.bpmn.traversal.ModelWalker;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 
 public final class BpmnTransformer {
 
@@ -73,6 +76,9 @@ public final class BpmnTransformer {
 
   private final ExpressionLanguage expressionLanguage;
   private final int maxNameFieldLength;
+  private final VersionedTransformerCatalog catalog;
+  private final Map<TransformerSlot, Integer> slotVersions;
+  private final TransformerFactoryContext factoryContext;
 
   public BpmnTransformer(final ExpressionLanguage expressionLanguage) {
     this(expressionLanguage, EngineConfiguration.DEFAULT_MAX_NAME_FIELD_LENGTH);
@@ -80,50 +86,98 @@ public final class BpmnTransformer {
 
   public BpmnTransformer(
       final ExpressionLanguage expressionLanguage, final int maxNameFieldLength) {
+    this(
+        expressionLanguage,
+        maxNameFieldLength,
+        VersionedTransformerCatalog.defaultCatalog(),
+        Map.of());
+  }
+
+  public BpmnTransformer(
+      final ExpressionLanguage expressionLanguage,
+      final int maxNameFieldLength,
+      final VersionedTransformerCatalog catalog,
+      final Map<TransformerSlot, Integer> slotVersions) {
     this.expressionLanguage = expressionLanguage;
     this.maxNameFieldLength = maxNameFieldLength;
+    this.catalog = catalog;
+    this.slotVersions = slotVersions;
+    factoryContext = new TransformerFactoryContext(expressionLanguage, maxNameFieldLength);
 
     step1Visitor = new TransformationVisitor();
-    step1Visitor.registerHandler(new ErrorTransformer());
-    step1Visitor.registerHandler(new EscalationTransformer());
-    step1Visitor.registerHandler(new FlowElementInstantiationTransformer());
-    step1Visitor.registerHandler(new MessageTransformer());
-    step1Visitor.registerHandler(new SignalTransformer());
-    step1Visitor.registerHandler(new ConditionalTransformer());
-    step1Visitor.registerHandler(new ProcessTransformer());
+    step1Visitor.registerHandler(handlerFor(TransformerSlot.ERROR, ErrorTransformer::new));
+    step1Visitor.registerHandler(
+        handlerFor(TransformerSlot.ESCALATION, EscalationTransformer::new));
+    step1Visitor.registerHandler(
+        handlerFor(
+            TransformerSlot.FLOW_ELEMENT_INSTANTIATION, FlowElementInstantiationTransformer::new));
+    step1Visitor.registerHandler(handlerFor(TransformerSlot.MESSAGE, MessageTransformer::new));
+    step1Visitor.registerHandler(handlerFor(TransformerSlot.SIGNAL, SignalTransformer::new));
+    step1Visitor.registerHandler(
+        handlerFor(TransformerSlot.CONDITIONAL, ConditionalTransformer::new));
+    step1Visitor.registerHandler(handlerFor(TransformerSlot.PROCESS, ProcessTransformer::new));
 
     step2Visitor = new TransformationVisitor();
-    step2Visitor.registerHandler(new BoundaryEventTransformer());
-    step2Visitor.registerHandler(new BusinessRuleTaskTransformer());
-    step2Visitor.registerHandler(new CallActivityTransformer());
-    step2Visitor.registerHandler(new CatchEventTransformer());
-    step2Visitor.registerHandler(new ContextProcessTransformer());
-    step2Visitor.registerHandler(new EndEventTransformer());
-    step2Visitor.registerHandler(new FlowNodeTransformer());
-    step2Visitor.registerHandler(new JobWorkerElementTransformer<>(ServiceTask.class));
-    step2Visitor.registerHandler(new JobWorkerElementTransformer<>(SendTask.class));
-    step2Visitor.registerHandler(new ReceiveTaskTransformer());
-    step2Visitor.registerHandler(new ScriptTaskTransformer());
-    step2Visitor.registerHandler(new SequenceFlowTransformer());
-    step2Visitor.registerHandler(new StartEventTransformer());
-    step2Visitor.registerHandler(new UserTaskTransformer(expressionLanguage));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.BOUNDARY_EVENT, BoundaryEventTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.BUSINESS_RULE_TASK, BusinessRuleTaskTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.CALL_ACTIVITY, CallActivityTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.CATCH_EVENT, CatchEventTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.CONTEXT_PROCESS, ContextProcessTransformer::new));
+    step2Visitor.registerHandler(handlerFor(TransformerSlot.END_EVENT, EndEventTransformer::new));
+    step2Visitor.registerHandler(handlerFor(TransformerSlot.FLOW_NODE, FlowNodeTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(
+            TransformerSlot.SERVICE_TASK_JOB_WORKER,
+            () -> new JobWorkerElementTransformer<>(ServiceTask.class)));
+    step2Visitor.registerHandler(
+        handlerFor(
+            TransformerSlot.SEND_TASK_JOB_WORKER,
+            () -> new JobWorkerElementTransformer<>(SendTask.class)));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.RECEIVE_TASK, ReceiveTaskTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.SCRIPT_TASK, ScriptTaskTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.SEQUENCE_FLOW, SequenceFlowTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.START_EVENT, StartEventTransformer::new));
+    step2Visitor.registerHandler(
+        handlerFor(TransformerSlot.USER_TASK, () -> new UserTaskTransformer(expressionLanguage)));
 
     step3Visitor = new TransformationVisitor();
-    step3Visitor.registerHandler(new ContextProcessTransformer());
-    step3Visitor.registerHandler(new EventBasedGatewayTransformer());
-    step3Visitor.registerHandler(new ExclusiveGatewayTransformer());
-    step3Visitor.registerHandler(new InclusiveGatewayTransformer());
-    step3Visitor.registerHandler(new IntermediateCatchEventTransformer());
-    step3Visitor.registerHandler(new SubProcessTransformer());
+    step3Visitor.registerHandler(
+        handlerFor(TransformerSlot.CONTEXT_PROCESS, ContextProcessTransformer::new));
+    step3Visitor.registerHandler(
+        handlerFor(TransformerSlot.EVENT_BASED_GATEWAY, EventBasedGatewayTransformer::new));
+    step3Visitor.registerHandler(
+        handlerFor(TransformerSlot.EXCLUSIVE_GATEWAY, ExclusiveGatewayTransformer::new));
+    step3Visitor.registerHandler(
+        handlerFor(TransformerSlot.INCLUSIVE_GATEWAY, InclusiveGatewayTransformer::new));
+    step3Visitor.registerHandler(
+        handlerFor(
+            TransformerSlot.INTERMEDIATE_CATCH_EVENT, IntermediateCatchEventTransformer::new));
+    step3Visitor.registerHandler(
+        handlerFor(TransformerSlot.SUB_PROCESS, SubProcessTransformer::new));
 
     step4Visitor = new TransformationVisitor();
-    step4Visitor.registerHandler(new ContextProcessTransformer());
-    step4Visitor.registerHandler(new IntermediateThrowEventTransformer());
-    step4Visitor.registerHandler(new AdHocSubProcessTransformer());
+    step4Visitor.registerHandler(
+        handlerFor(TransformerSlot.CONTEXT_PROCESS, ContextProcessTransformer::new));
+    step4Visitor.registerHandler(
+        handlerFor(
+            TransformerSlot.INTERMEDIATE_THROW_EVENT, IntermediateThrowEventTransformer::new));
+    step4Visitor.registerHandler(
+        handlerFor(TransformerSlot.AD_HOC_SUB_PROCESS, AdHocSubProcessTransformer::new));
 
     step5Visitor = new TransformationVisitor();
-    step5Visitor.registerHandler(new ContextProcessTransformer());
-    step5Visitor.registerHandler(new MultiInstanceActivityTransformer());
+    step5Visitor.registerHandler(
+        handlerFor(TransformerSlot.CONTEXT_PROCESS, ContextProcessTransformer::new));
+    step5Visitor.registerHandler(
+        handlerFor(TransformerSlot.MULTI_INSTANCE_ACTIVITY, MultiInstanceActivityTransformer::new));
   }
 
   public List<ExecutableProcess> transformDefinitions(final BpmnModelInstance modelInstance) {
@@ -148,5 +202,26 @@ public final class BpmnTransformer {
     walker.walk(step5Visitor);
 
     return context.getProcesses();
+  }
+
+  @SuppressWarnings("unchecked")
+  private <T extends BpmnModelElementInstance> ModelElementTransformer<T> handlerFor(
+      final TransformerSlot slot, final Supplier<ModelElementTransformer<T>> v1Factory) {
+    final int requested = slotVersions.getOrDefault(slot, TransformerSlot.DEFAULT_VERSION);
+    if (requested <= TransformerSlot.DEFAULT_VERSION) {
+      return v1Factory.get();
+    }
+    return catalog
+        .resolve(slot, requested)
+        .map(f -> (ModelElementTransformer<T>) f.apply(factoryContext))
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "Slot "
+                        + slot
+                        + " was pinned to version "
+                        + requested
+                        + " at deploy time but no factory is registered at exactly that version."
+                        + " The catalog is missing a handler that existed when the process was deployed."));
   }
 }
