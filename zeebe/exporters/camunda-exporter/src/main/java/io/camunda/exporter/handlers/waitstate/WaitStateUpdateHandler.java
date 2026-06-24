@@ -40,7 +40,7 @@ public class WaitStateUpdateHandler<R extends RecordValue & WaitStateRelated>
 
   @Override
   public boolean handlesRecord(final Record<R> record) {
-    return getTransformer().triggersUpdate(record);
+    return transformer.triggersUpdate(record);
   }
 
   @Override
