@@ -581,10 +581,7 @@ class PhysicalTenantAuthConfigurationsTest {
     assertThat(cfg.getProviders().getOidc()).containsKey("a");
   }
 
-  // -------------------------------------------------------------------------
   // forAllPhysicalTenants
-  // -------------------------------------------------------------------------
-
   @Test
   void shouldReturnOnlyDefaultWhenNoPtsConfigured() {
     // given
