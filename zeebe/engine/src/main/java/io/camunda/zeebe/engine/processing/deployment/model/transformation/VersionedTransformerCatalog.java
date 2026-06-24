@@ -23,6 +23,8 @@ import java.util.function.Function;
  */
 public final class VersionedTransformerCatalog {
 
+  private static final VersionedTransformerCatalog DEFAULT = builder().build();
+
   private final Map<TransformerSlot, TreeMap<Integer, Factory>> bySlot;
 
   private VersionedTransformerCatalog(
@@ -32,7 +34,7 @@ public final class VersionedTransformerCatalog {
 
   /** The production catalog. Empty today — populated as sub-transformers gain new versions. */
   public static VersionedTransformerCatalog defaultCatalog() {
-    return builder().build();
+    return DEFAULT;
   }
 
   public static Builder builder() {
