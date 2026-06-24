@@ -7,10 +7,12 @@
  */
 package io.camunda.zeebe.engine.state.mutable;
 
+import io.camunda.zeebe.engine.processing.deployment.model.transformation.TransformerSlot;
 import io.camunda.zeebe.engine.state.deployment.PersistedProcess.PersistedProcessState;
 import io.camunda.zeebe.engine.state.immutable.ProcessState;
 import io.camunda.zeebe.protocol.impl.record.value.deployment.DeploymentRecord;
 import io.camunda.zeebe.protocol.impl.record.value.deployment.ProcessRecord;
+import java.util.Map;
 
 public interface MutableProcessState extends ProcessState {
 
@@ -51,4 +53,12 @@ public interface MutableProcessState extends ProcessState {
    * @param processRecord the record of the process that is deleted
    */
   void deleteProcess(final ProcessRecord processRecord);
+
+  /**
+   * Stores the per-slot BPMN sub-transformer versions that were current at the time this process
+   * was deployed. Called by the versioned ProcessCreated applier so that replay reassembles a
+   * deterministic transformer pipeline. The map is sparse: only slots with version > 1 are stored.
+   */
+  void storeTransformerVersions(
+      long processDefinitionKey, String tenantId, Map<TransformerSlot, Integer> slotVersions);
 }

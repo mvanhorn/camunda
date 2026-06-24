@@ -21,12 +21,16 @@ import io.camunda.zeebe.db.impl.DbLong;
 import io.camunda.zeebe.db.impl.DbString;
 import io.camunda.zeebe.db.impl.DbTenantAwareKey;
 import io.camunda.zeebe.db.impl.DbTenantAwareKey.PlacementType;
+import io.camunda.zeebe.el.ExpressionLanguage;
+import io.camunda.zeebe.el.ExpressionLanguageFactory;
 import io.camunda.zeebe.el.ExpressionLanguageMetrics;
 import io.camunda.zeebe.engine.EngineConfiguration;
-import io.camunda.zeebe.engine.processing.deployment.model.BpmnFactory;
+import io.camunda.zeebe.engine.processing.bpmn.clock.ZeebeFeelEngineClock;
 import io.camunda.zeebe.engine.processing.deployment.model.element.ExecutableFlowElement;
 import io.camunda.zeebe.engine.processing.deployment.model.element.ExecutableProcess;
 import io.camunda.zeebe.engine.processing.deployment.model.transformation.BpmnTransformer;
+import io.camunda.zeebe.engine.processing.deployment.model.transformation.TransformerSlot;
+import io.camunda.zeebe.engine.processing.deployment.model.transformation.VersionedTransformerCatalog;
 import io.camunda.zeebe.engine.state.deployment.PersistedProcess.PersistedProcessState;
 import io.camunda.zeebe.engine.state.mutable.MutableProcessState;
 import io.camunda.zeebe.model.bpmn.Bpmn;
@@ -38,7 +42,10 @@ import io.camunda.zeebe.protocol.impl.record.value.deployment.ProcessRecord;
 import io.camunda.zeebe.protocol.record.value.deployment.DeploymentResource;
 import io.camunda.zeebe.util.buffer.BufferUtil;
 import java.time.InstantSource;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import org.agrona.DirectBuffer;
@@ -49,8 +56,12 @@ import org.agrona.io.DirectBufferInputStream;
 public final class DbProcessState implements MutableProcessState {
 
   private static final int DEFAULT_VERSION_VALUE = 0;
+  private static final int TRANSFORMER_MAX_NAME_FIELD_LENGTH = Integer.MAX_VALUE;
 
   private final BpmnTransformer transformer;
+  private final ExpressionLanguage expressionLanguage;
+  private final VersionedTransformerCatalog transformerCatalog =
+      VersionedTransformerCatalog.defaultCatalog();
   private final ProcessRecord processRecordForDeployments = new ProcessRecord();
   private final Cache<TenantIdAndProcessIdAndVersion, DeployedProcess>
       processesByTenantAndProcessIdAndVersionCache;
@@ -110,6 +121,11 @@ public final class DbProcessState implements MutableProcessState {
 
   private final VersionManager versionManager;
 
+  private final ColumnFamily<DbTenantAwareKey<DbLong>, PersistedTransformerVersions>
+      transformerVersionsColumnFamily;
+  private final PersistedTransformerVersions persistedTransformerVersions =
+      new PersistedTransformerVersions();
+
   public DbProcessState(
       final ZeebeDb<ZbColumnFamilies> zeebeDb,
       final TransactionContext transactionContext,
@@ -119,8 +135,14 @@ public final class DbProcessState implements MutableProcessState {
     // Since this transformer is used for processes from the engine state, we set the max length to
     // Integer.MAX_VALUE, because validation has already happened during deployment and we want to
     // be able to transform processes even if the max length has been changes in the meantime.
+    // We build expressionLanguage explicitly so it can be reused when constructing per-process
+    // transformers during replay (avoiding repeated FEEL engine initialisation).
+    expressionLanguage =
+        ExpressionLanguageFactory.createExpressionLanguage(
+            new ZeebeFeelEngineClock(clock), expressionLanguageMetrics);
     transformer =
-        BpmnFactory.createTransformer(clock, expressionLanguageMetrics, Integer.MAX_VALUE);
+        new BpmnTransformer(
+            expressionLanguage, TRANSFORMER_MAX_NAME_FIELD_LENGTH, transformerCatalog, Map.of());
     processDefinitionKey = new DbLong();
     persistedProcess = new PersistedProcess();
     tenantIdKey = new DbString();
@@ -185,6 +207,13 @@ public final class DbProcessState implements MutableProcessState {
     versionManager =
         new VersionManager(
             DEFAULT_VERSION_VALUE, zeebeDb, ZbColumnFamilies.PROCESS_VERSION, transactionContext);
+
+    transformerVersionsColumnFamily =
+        zeebeDb.createColumnFamily(
+            ZbColumnFamilies.PROCESS_TRANSFORMER_VERSIONS,
+            transactionContext,
+            tenantAwareProcessDefinitionKey,
+            persistedTransformerVersions);
 
     processByTenantAndKeyCache =
         CacheBuilder.newBuilder().maximumSize(config.getProcessCacheCapacity()).build();
@@ -332,6 +361,7 @@ public final class DbProcessState implements MutableProcessState {
 
     versionManager.deleteResourceVersion(
         processRecord.getBpmnProcessId(), processRecord.getVersion(), processRecord.getTenantId());
+    transformerVersionsColumnFamily.deleteIfExists(tenantAwareProcessDefinitionKey);
   }
 
   private void invalidateCaches(
@@ -388,7 +418,20 @@ public final class DbProcessState implements MutableProcessState {
 
     final BpmnModelInstance modelInstance =
         readModelInstanceFromBuffer(copiedProcess.getResource());
-    final List<ExecutableProcess> definitions = transformer.transformDefinitions(modelInstance);
+    // readSlotVersions wraps tenantIdKey/processDefinitionKey for its CF read. Nothing after it
+    // in this method touches those holders, so their state after the call is irrelevant.
+    final Map<TransformerSlot, Integer> slotVersions =
+        readSlotVersions(copiedProcess.getKey(), copiedProcess.getTenantId());
+    final BpmnTransformer processTransformer =
+        slotVersions.isEmpty()
+            ? transformer // shared default (all-v1) — the only case today
+            : new BpmnTransformer(
+                expressionLanguage,
+                TRANSFORMER_MAX_NAME_FIELD_LENGTH,
+                transformerCatalog,
+                slotVersions);
+    final List<ExecutableProcess> definitions =
+        processTransformer.transformDefinitions(modelInstance);
 
     final ExecutableProcess executableProcess =
         definitions.stream()
@@ -683,6 +726,42 @@ public final class DbProcessState implements MutableProcessState {
     }
     // does not exist in persistence and in memory state
     return null;
+  }
+
+  @Override
+  public void storeTransformerVersions(
+      final long processDefinitionKey,
+      final String tenantId,
+      final Map<TransformerSlot, Integer> slotVersions) {
+    final boolean hasNonDefault = slotVersions.values().stream().anyMatch(v -> v != null && v > 1);
+    if (!hasNonDefault) {
+      return;
+    }
+    tenantIdKey.wrapString(tenantId);
+    this.processDefinitionKey.wrapLong(processDefinitionKey);
+    final Map<Integer, Integer> byId = new HashMap<>();
+    slotVersions.forEach((slot, version) -> byId.put(slot.id(), version));
+    persistedTransformerVersions.setVersions(byId);
+    transformerVersionsColumnFamily.upsert(
+        tenantAwareProcessDefinitionKey, persistedTransformerVersions);
+  }
+
+  private Map<TransformerSlot, Integer> readSlotVersions(final long key, final String tenantId) {
+    tenantIdKey.wrapString(tenantId);
+    processDefinitionKey.wrapLong(key);
+    final var stored = transformerVersionsColumnFamily.get(tenantAwareProcessDefinitionKey);
+    if (stored == null || stored.isEmpty()) {
+      return Map.of();
+    }
+    final Map<TransformerSlot, Integer> result = new EnumMap<>(TransformerSlot.class);
+    final var byId = stored.asMap();
+    for (final TransformerSlot slot : TransformerSlot.values()) {
+      final Integer v = byId.get(slot.id());
+      if (v != null && v > 1) {
+        result.put(slot, v);
+      }
+    }
+    return result;
   }
 
   record TenantIdAndProcessIdAndVersion(String tenantId, DirectBuffer processId, long Version) {}
