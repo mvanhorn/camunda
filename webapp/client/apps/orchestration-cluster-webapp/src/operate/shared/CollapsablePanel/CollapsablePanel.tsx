@@ -22,7 +22,7 @@ type Props = {
 	footer?: React.ReactNode;
 	maxWidth: number;
 	scrollable?: boolean;
-	collapsablePanelRef?: React.RefObject<HTMLDivElement | null>;
+	collapsablePanelRef?: React.RefObject<HTMLElement | null>;
 };
 
 const CollapsablePanel = forwardRef<HTMLDivElement, Props>(
