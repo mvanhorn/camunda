@@ -129,7 +129,8 @@ public class TasklistAPICaller {
 
   public GetBackupStateResponseDto getBackupState(final Long backupId) {
     return mgmtRestTemplate.getForObject(
-        mgmtRestTemplate.getURL("actuator/backupHistory/" + backupId), GetBackupStateResponseDto.class);
+        mgmtRestTemplate.getURL("actuator/backupHistory/" + backupId),
+        GetBackupStateResponseDto.class);
   }
 
   @Retryable(maxRetries = 10, delay = 2000, includes = TasklistRuntimeException.class)
