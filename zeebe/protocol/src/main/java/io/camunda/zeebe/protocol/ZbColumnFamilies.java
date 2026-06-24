@@ -323,7 +323,16 @@ public enum ZbColumnFamilies implements EnumValue, ScopedColumnFamily {
   // looks up blocked starts by businessId here and re-attempts the ordinary local start. Mirrors
   // the
   // correlation-key buffer's completion-driven re-drive (see ADR 0002 D5).
-  MESSAGE_BY_BUSINESS_ID(149, PARTITION_LOCAL);
+  MESSAGE_BY_BUSINESS_ID(149, PARTITION_LOCAL),
+
+  /**
+   * Stores, per process definition, the version of each BPMN sub-transformer that was current at
+   * deploy time. Sparse: only slots whose version is greater than the default (1) are stored; an
+   * absent slot (or absent row) resolves to version 1. GLOBAL because process definitions are
+   * shared across partitions. Read on cache miss to reassemble a deterministic transformer pipeline
+   * for replay.
+   */
+  PROCESS_TRANSFORMER_VERSIONS(150, GLOBAL);
 
   private final int value;
   private final ColumnFamilyScope columnFamilyScope;
