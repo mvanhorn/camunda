@@ -252,7 +252,8 @@ class JobWaitStateHandlerTest {
     // when
     updateHandler.updateEntity(record, entity);
 
-    // then — entity reflects the post-migration element id; all other fields are also updated
+    // then — entity reflects the post-migration element id (update handler sends ELEMENT_ID +
+    // DETAILS only)
     assertThat(entity.getElementId()).isEqualTo("task-after-migration");
     assertThat(entity.getElementType()).isEqualTo(BpmnElementType.SERVICE_TASK.name());
     assertThat(entity.getProcessInstanceKey()).isEqualTo(200L);
