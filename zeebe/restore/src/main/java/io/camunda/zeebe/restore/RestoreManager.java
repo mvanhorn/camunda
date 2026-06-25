@@ -241,7 +241,7 @@ public class RestoreManager implements CloseableSilently {
       final var partitionsToRestore = collectPartitions();
       final var tasks = new ArrayList<Callable<Void>>(partitionsToRestore.size());
       for (final var partition : partitionsToRestore) {
-        final var partitionId = partition.partition().id().id();
+        final var partitionId = partition.partition().id().number();
         final var backupIds = backupIdsByPartition.get(partitionId);
         if (backupIds == null || backupIds.length == 0) {
           throw new IllegalArgumentException("No backup IDs provided for partition " + partitionId);
@@ -315,7 +315,7 @@ public class RestoreManager implements CloseableSilently {
       restoreService.restore(backupIds, validator);
       LOG.info(
           "Successfully restored partition {} from backups {}.",
-          raftPartition.id().id(),
+          raftPartition.id().number(),
           backupIds);
     } finally {
       MicrometerUtil.close(registry);
@@ -340,7 +340,7 @@ public class RestoreManager implements CloseableSilently {
 
   private InstrumentedRaftPartition createRaftPartition(
       final PartitionMetadata metadata, final RaftPartitionFactory factory) {
-    final var partitionId = metadata.id().id();
+    final var partitionId = metadata.id().number();
     final var partitionRegistry =
         MicrometerUtil.wrap(meterRegistry, PartitionKeyNames.tags(partitionId));
 

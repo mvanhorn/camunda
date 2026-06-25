@@ -93,7 +93,7 @@ final class RecoveryPartitionManagerTest {
 
   private PartitionMetadata localPartitionMetadata(final int partitionId) {
     return new PartitionMetadata(
-        PartitionId.from(GROUP, partitionId),
+        new PartitionId(GROUP, partitionId),
         Set.of(localMemberId),
         Map.of(localMemberId, 1),
         1,

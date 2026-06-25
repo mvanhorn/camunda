@@ -105,7 +105,8 @@ public class RaftServerReceiverSubjectsTest {
   }
 
   void assertSubjectsRegistered(final String prefix, final int expected) {
-    final var subjectPrefix = PARTITION_NAME_FORMAT.formatted(prefix, PARTITION_ID.id()) + "-%s";
+    final var subjectPrefix =
+        PARTITION_NAME_FORMAT.formatted(prefix, PARTITION_ID.number()) + "-%s";
     final var expectedNumberOfInvocations = expected > 0 ? times(expected) : never();
 
     verify(clusterCommunicationService, expectedNumberOfInvocations)
@@ -141,7 +142,8 @@ public class RaftServerReceiverSubjectsTest {
   }
 
   void assertSubjectsUnregistered(final String prefix, final int expected) {
-    final var partitionName = PARTITION_NAME_FORMAT.formatted(prefix, PARTITION_ID.id()) + "-%s";
+    final var partitionName =
+        PARTITION_NAME_FORMAT.formatted(prefix, PARTITION_ID.number()) + "-%s";
     final var expectedNumberOfInvocations = expected > 0 ? times(expected) : never();
 
     verify(clusterCommunicationService, expectedNumberOfInvocations)

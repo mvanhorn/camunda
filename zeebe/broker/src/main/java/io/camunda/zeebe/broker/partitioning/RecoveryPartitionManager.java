@@ -156,7 +156,7 @@ public final class RecoveryPartitionManager implements PartitionManager {
   }
 
   private void deactivatePartition(final PartitionId partitionId) {
-    topologyManager.setInactive(partitionId.id());
+    topologyManager.setInactive(partitionId.number());
   }
 
   private Path partitionDirectory(final PartitionId partitionId) {

@@ -165,7 +165,7 @@ public class RaftPartitionServer implements HealthMonitorable {
   }
 
   private RaftServer buildServer(final MeterRegistry meterRegistry) {
-    final var partitionId = partition.id().id();
+    final var partitionId = partition.id().number();
     final var electionConfig =
         config.isPriorityElectionEnabled()
             ? RaftElectionConfig.ofPriorityElection(
@@ -307,7 +307,7 @@ public class RaftPartitionServer implements HealthMonitorable {
     final RaftStorageConfig storageConfig = config.getStorageConfig();
     return RaftStorage.builder(meterRegistry)
         .withPrefix(partition.name())
-        .withPartitionId(partition.id().id())
+        .withPartitionId(partition.id().number())
         .withDirectory(partition.dataDirectory())
         .withMaxSegmentSize((int) storageConfig.getSegmentSize())
         .withFlusherFactory(storageConfig.flusherFactory())
@@ -353,7 +353,8 @@ public class RaftPartitionServer implements HealthMonitorable {
     // yet. This is decoupled from partition.name() because the GROUP_NAME constant was changed to
     // "default" as part of #50538. Only the default engine sets this — non-default engines have no
     // legacy subjects to listen on.
-    final var legacyPrefix = PARTITION_NAME_FORMAT.formatted(legacyGroupName, partition.id().id());
+    final var legacyPrefix =
+        PARTITION_NAME_FORMAT.formatted(legacyGroupName, partition.id().number());
     return new RaftMessageContext(legacyPrefix);
   }
 
@@ -380,7 +381,7 @@ public class RaftPartitionServer implements HealthMonitorable {
 
   private String getPartitionNameWithTenantPrefix() {
     final var tenantName = config.getTenantName();
-    final var partitionId = partition.id().id();
+    final var partitionId = partition.id().number();
     return PARTITION_NAME_FORMAT.formatted(tenantName, partitionId);
   }
 

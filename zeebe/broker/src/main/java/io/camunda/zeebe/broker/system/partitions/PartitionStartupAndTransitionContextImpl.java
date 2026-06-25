@@ -159,7 +159,7 @@ public class PartitionStartupAndTransitionContextImpl
     this.persistedSnapshotStore = persistedSnapshotStore;
     this.partitionListeners = Collections.unmodifiableList(partitionListeners);
     this.partitionRaftListeners = Collections.unmodifiableList(partitionRaftListeners);
-    partitionId = raftPartition.id().id();
+    partitionId = raftPartition.id().number();
     this.actorSchedulingService = actorSchedulingService;
     maxFragmentSize = (int) brokerCfg.getNetwork().getMaxMessageSizeInBytes();
     this.exporterRepository = exporterRepository;

@@ -161,7 +161,7 @@ public final class PartitionManagerImpl
       final DynamicPartitionConfig initialPartitionConfig,
       final boolean initializeFromSnapshot) {
     final var result = concurrencyControl.<Void>createFuture();
-    final var id = partitionMetadata.id().id();
+    final var id = partitionMetadata.id().number();
     final var context =
         new PartitionStartupContext(
             actorSchedulingService,
@@ -182,7 +182,7 @@ public final class PartitionManagerImpl
     final var partition = Partition.bootstrapping(context);
     if (partitions.putIfAbsent(id, partition) != null) {
       result.completeExceptionally(
-          new PartitionAlreadyExistsException(partitionMetadata.id().id()));
+          new PartitionAlreadyExistsException(partitionMetadata.id().number()));
     } else {
       concurrencyControl.runOnCompletion(
           partition.start(), (started, error) -> completePartitionStart(id, error, result));
@@ -195,7 +195,7 @@ public final class PartitionManagerImpl
       final PartitionMetadata partitionMetadata,
       final DynamicPartitionConfig initialPartitionConfig) {
     final var result = concurrencyControl.<Void>createFuture();
-    final var id = partitionMetadata.id().id();
+    final var id = partitionMetadata.id().number();
     final var context =
         new PartitionStartupContext(
             actorSchedulingService,
@@ -307,7 +307,7 @@ public final class PartitionManagerImpl
               .getInitialClusterConfiguration()
               .members()
               .get(localMemberId)
-              .getPartition(partitionMetadata.id().id())
+              .getPartition(partitionMetadata.id().number())
               .config();
       bootstrapPartition(partitionMetadata, initialPartitionConfig, false);
     }
@@ -355,7 +355,7 @@ public final class PartitionManagerImpl
 
     final var partitionMetadata =
         new PartitionMetadata(
-            PartitionId.from(partitionGroup, partitionId),
+            new PartitionId(partitionGroup, partitionId),
             members,
             membersWithPriority,
             targetPriority,
@@ -407,7 +407,7 @@ public final class PartitionManagerImpl
 
     final var partitionMetadata =
         new PartitionMetadata(
-            PartitionId.from(partitionGroup, partitionId),
+            new PartitionId(partitionGroup, partitionId),
             members,
             Map.of(localMember, targetPriority),
             targetPriority,

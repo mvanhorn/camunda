@@ -29,7 +29,7 @@ public interface PartitionManager {
    * @return the partition with the given id or null if partition does not exist
    */
   default @Nullable RaftPartition getRaftPartition(final PartitionId partitionId) {
-    return getRaftPartition(partitionId.id());
+    return getRaftPartition(partitionId.number());
   }
 
   /**
