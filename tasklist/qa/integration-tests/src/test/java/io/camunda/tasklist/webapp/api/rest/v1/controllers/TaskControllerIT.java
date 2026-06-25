@@ -100,7 +100,7 @@ public class TaskControllerIT extends TasklistZeebeIntegrationTest {
         .and()
         .startProcessInstances(bpmnProcessId, numberOfInstances)
         .then()
-        .taskIsCreated(flowNodeBpmnId);
+        .tasksAreCreated(flowNodeBpmnId, numberOfInstances);
   }
 
   private TasklistTester createTask(
@@ -868,6 +868,9 @@ public class TaskControllerIT extends TasklistZeebeIntegrationTest {
       createTaskWithCandidateGroup(bpmnProcessId, flowNodeBpmnId, numberOfInstancesAdmin, "Admins");
       createTaskWithCandidateGroup(bpmnProcessId, flowNodeBpmnId, numberOfInstancesUser, "Users");
       createTaskWithCandidateUser(bpmnProcessId, flowNodeBpmnId, numberOfInstancesUser, "demo");
+      tester.tasksAreCreated(
+          flowNodeBpmnId,
+          numberOfInstancesAdmin + numberOfInstancesUser + numberOfInstancesCandidateUser);
 
       // Mock identity service behaviour
       identityProperties.setUserAccessRestrictionsEnabled(true);
