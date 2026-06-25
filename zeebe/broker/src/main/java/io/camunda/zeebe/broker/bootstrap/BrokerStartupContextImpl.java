@@ -41,6 +41,7 @@ import io.camunda.zeebe.protocol.impl.encoding.BrokerInfo;
 import io.camunda.zeebe.scheduler.ActorSchedulingService;
 import io.camunda.zeebe.scheduler.ConcurrencyControl;
 import io.camunda.zeebe.transport.impl.AtomixServerTransport;
+import io.camunda.zeebe.util.FeatureFlags;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -78,6 +79,7 @@ public final class BrokerStartupContextImpl implements BrokerStartupContext {
   private final PhysicalTenantIds physicalTenantIds;
   private final Map<String, BrokerRequestAuthorizationConverter>
       brokerRequestAuthorizationConvertersByPhysicalTenant;
+  private final Map<String, FeatureFlags> featureFlagsByPhysicalTenant;
 
   private ConcurrencyControl concurrencyControl;
   private DiskSpaceUsageMonitor diskSpaceUsageMonitor;
@@ -115,6 +117,7 @@ public final class BrokerStartupContextImpl implements BrokerStartupContext {
       final SearchClientsProxy searchClientsProxy,
       final Map<String, BrokerRequestAuthorizationConverter>
           brokerRequestAuthorizationConvertersByPhysicalTenant,
+      final Map<String, FeatureFlags> featureFlagsByPhysicalTenant,
       final NodeIdProvider nodeIdProvider,
       final PhysicalTenantIds physicalTenantIds) {
 
@@ -141,6 +144,7 @@ public final class BrokerStartupContextImpl implements BrokerStartupContext {
     partitionListeners.addAll(additionalPartitionListeners);
     this.brokerRequestAuthorizationConvertersByPhysicalTenant =
         Collections.unmodifiableMap(brokerRequestAuthorizationConvertersByPhysicalTenant);
+    this.featureFlagsByPhysicalTenant = Map.copyOf(featureFlagsByPhysicalTenant);
   }
 
   @Override
@@ -421,6 +425,14 @@ public final class BrokerStartupContextImpl implements BrokerStartupContext {
       throw new IllegalArgumentException("Unknown physical tenant id '" + physicalTenantId + "'");
     }
     return brokerRequestAuthorizationConvertersByPhysicalTenant.get(physicalTenantId);
+  }
+
+  @Override
+  public FeatureFlags getFeatureFlags(final String physicalTenantId) {
+    if (!featureFlagsByPhysicalTenant.containsKey(physicalTenantId)) {
+      throw new IllegalArgumentException("Unknown physical tenant id '" + physicalTenantId + "'");
+    }
+    return featureFlagsByPhysicalTenant.get(physicalTenantId);
   }
 
   @Override

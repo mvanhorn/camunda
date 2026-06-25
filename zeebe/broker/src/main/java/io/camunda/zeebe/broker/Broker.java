@@ -94,6 +94,7 @@ public final class Broker implements AutoCloseable {
             systemContext.getOidcClaimsProvider(),
             systemContext.getSearchClientsProxy(),
             systemContext.getBrokerRequestAuthorizationConvertersByPhysicalTenant(),
+            systemContext.getFeatureFlagsByPhysicalTenant(),
             systemContext.getNodeIdProvider(),
             systemContext.getPhysicalTenantIds());
 

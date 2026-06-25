@@ -158,6 +158,7 @@ final class PartitionManagerStep extends AbstractBrokerStartupStep {
         brokerStartupContext.getSecurityConfiguration(physicalTenantId),
         brokerStartupContext.getSearchClientsProxy(),
         brokerStartupContext.getBrokerRequestAuthorizationConverter(physicalTenantId),
+        brokerStartupContext.getFeatureFlags(physicalTenantId),
         topologyManager);
   }
 
