@@ -229,15 +229,17 @@ public class ElasticsearchArchiverRepository implements ArchiverRepository {
             executor)
         .whenComplete(
             (ignored, error) -> {
+              final var totalArchived = supplier.getTotalArchived();
               indexTimer.stop(
-                  metrics.getTimer(
-                      Metrics.TIMER_NAME_ARCHIVER_ARCHIVE_BY_ID_INDEX, "source", sourceIndexName));
+                  metrics.getHistogram(
+                      Metrics.TIMER_NAME_ARCHIVER_INDEX_DURATION, "source", sourceIndexName));
+              metrics.recordCounts(Metrics.COUNTER_NAME_ARCHIVER_REINDEXED_DOCS, totalArchived);
               if (error != null) {
                 LOGGER.warn(
                     "Failed archiving {} to the {} index, moved {} docs so far in {}s, error={}",
                     sourceIndexName,
                     destinationIndexName,
-                    supplier.getTotalArchived(),
+                    totalArchived,
                     supplier.getTotalTimeTakenMs() / 1000,
                     error.getMessage(),
                     error);
@@ -246,7 +248,7 @@ public class ElasticsearchArchiverRepository implements ArchiverRepository {
                     "Successfully completed archiving {} to the {} index, moved {} docs in {}s",
                     sourceIndexName,
                     destinationIndexName,
-                    supplier.getTotalArchived(),
+                    totalArchived,
                     supplier.getTotalTimeTakenMs() / 1000);
               }
             });
@@ -383,7 +385,8 @@ public class ElasticsearchArchiverRepository implements ArchiverRepository {
   }
 
   private Timer getArchiverDocIdsBatchQueryTimer() {
-    return metrics.getTimer(Metrics.TIMER_NAME_ARCHIVER_ARCHIVE_BY_ID_DOC_IDS_QUERY);
+    return metrics.getHistogram(
+        Metrics.TIMER_NAME_ARCHIVER_REQUEST_DURATION, Metrics.TAG_KEY_TYPE, "search");
   }
 
   private CompletableFuture<Long> reindexDocumentsById(
@@ -409,7 +412,10 @@ public class ElasticsearchArchiverRepository implements ArchiverRepository {
         .whenCompleteAsync(
             (total, error) -> {
               metrics.recordCounts(Metrics.COUNTER_NAME_ARCHIVER_REINDEXED_DOCS, total);
-              timer.stop(getArchiverReindexQueryTimer());
+              timer.stop(
+                  metrics.getHistogram(
+                      Metrics.TIMER_NAME_ARCHIVER_REQUEST_DURATION, Metrics.TAG_KEY_TYPE,
+                      "reindex"));
             },
             executor);
   }
@@ -449,7 +455,10 @@ public class ElasticsearchArchiverRepository implements ArchiverRepository {
         .whenCompleteAsync(
             (deleted, error) -> {
               metrics.recordCounts(Metrics.COUNTER_NAME_ARCHIVER_DELETED_DOCS, deleted);
-              timer.stop(getArchiverDeleteQueryTimer());
+              timer.stop(
+                  metrics.getHistogram(
+                      Metrics.TIMER_NAME_ARCHIVER_REQUEST_DURATION, Metrics.TAG_KEY_TYPE,
+                      "delete"));
             },
             executor);
   }

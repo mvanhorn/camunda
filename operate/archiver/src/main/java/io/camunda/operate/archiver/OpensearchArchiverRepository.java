@@ -262,15 +262,17 @@ public class OpensearchArchiverRepository implements ArchiverRepository {
             executor)
         .whenComplete(
             (ignored, error) -> {
+              final var totalArchived = supplier.getTotalArchived();
               indexTimer.stop(
-                  metrics.getTimer(
-                      Metrics.TIMER_NAME_ARCHIVER_ARCHIVE_BY_ID_INDEX, "source", sourceIndexName));
+                  metrics.getHistogram(
+                      Metrics.TIMER_NAME_ARCHIVER_INDEX_DURATION, "source", sourceIndexName));
+              metrics.recordCounts(Metrics.COUNTER_NAME_ARCHIVER_REINDEXED_DOCS, totalArchived);
               if (error != null) {
                 LOGGER.warn(
                     "Failed archiving {} to the {} index, moved {} docs so far in {}s, error={}",
                     sourceIndexName,
                     destinationIndexName,
-                    supplier.getTotalArchived(),
+                    totalArchived,
                     supplier.getTotalTimeTakenMs() / 1000,
                     error.getMessage(),
                     error);
@@ -279,7 +281,7 @@ public class OpensearchArchiverRepository implements ArchiverRepository {
                     "Successfully completed archiving {} to the {} index, moved {} docs in {}s",
                     sourceIndexName,
                     destinationIndexName,
-                    supplier.getTotalArchived(),
+                    totalArchived,
                     supplier.getTotalTimeTakenMs() / 1000);
               }
             });
@@ -409,7 +411,9 @@ public class OpensearchArchiverRepository implements ArchiverRepository {
         .whenCompleteAsync(
             (ignored, error) ->
                 timer.stop(
-                    metrics.getTimer(Metrics.TIMER_NAME_ARCHIVER_ARCHIVE_BY_ID_DOC_IDS_QUERY)),
+                    metrics.getHistogram(
+                        Metrics.TIMER_NAME_ARCHIVER_REQUEST_DURATION, Metrics.TAG_KEY_TYPE,
+                        "search")),
             executor)
         .thenApply(
             response -> {
@@ -447,7 +451,10 @@ public class OpensearchArchiverRepository implements ArchiverRepository {
         .whenCompleteAsync(
             (total, error) -> {
               metrics.recordCounts(Metrics.COUNTER_NAME_ARCHIVER_REINDEXED_DOCS, total);
-              timer.stop(metrics.getTimer(Metrics.TIMER_NAME_ARCHIVER_REINDEX_QUERY));
+              timer.stop(
+                  metrics.getHistogram(
+                      Metrics.TIMER_NAME_ARCHIVER_REQUEST_DURATION, Metrics.TAG_KEY_TYPE,
+                      "reindex"));
             },
             executor);
   }
@@ -490,7 +497,10 @@ public class OpensearchArchiverRepository implements ArchiverRepository {
           .whenCompleteAsync(
               (deleted, error) -> {
                 metrics.recordCounts(Metrics.COUNTER_NAME_ARCHIVER_DELETED_DOCS, deleted);
-                timer.stop(metrics.getTimer(Metrics.TIMER_NAME_ARCHIVER_DELETE_QUERY));
+                timer.stop(
+                    metrics.getHistogram(
+                        Metrics.TIMER_NAME_ARCHIVER_REQUEST_DURATION, Metrics.TAG_KEY_TYPE,
+                        "delete"));
               },
               executor);
     } catch (final IOException e) {
