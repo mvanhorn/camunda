@@ -27,6 +27,8 @@ const config: KnipConfig = {
 		'src/operate/shared/StateIcon/**',
 		'src/operate/shared/PanelHeader/**',
 		'src/operate/shared/DiagramShell/**',
+		// TODO(#55642): remove when BatchOperation detail page is migrated
+		'src/operate/shared/PaginatedSortableTable/**',
 	],
 	ignoreDependencies: ['@vitest/browser', '@devbookhq/splitter'],
 };
