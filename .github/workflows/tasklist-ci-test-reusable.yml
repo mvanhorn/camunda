@@ -31,7 +31,7 @@ on:
       forkCount:
         description: "The number of VMs to fork in parallel in order to execute the tests"
         required: false
-        default: 4
+        default: 12
         type: number
 
 defaults:
@@ -72,7 +72,7 @@ jobs:
         uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           ref: refs/heads/${{ inputs.branch }}
-          fetch-depth: 0 # fetches all history for all branches and tags
+          fetch-depth: 1
 
       # Setup: configure Java, Maven, settings.xml
       - uses: ./.github/actions/setup-build
@@ -84,10 +84,9 @@ jobs:
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
           minimus: true
-      - uses: ./.github/actions/build-zeebe
+      - name: Build Camunda (scoped)
         id: build-camunda
-        with:
-          maven-extra-args: -PskipFrontendBuild
+        run: ./mvnw -B -T1C -DskipTests -DskipChecks install -pl tasklist/qa/integration-tests -am -PskipFrontendBuild
 
       # Run integration tests in parallel
       - name: Run Integration Tests
